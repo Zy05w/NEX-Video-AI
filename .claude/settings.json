@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"[Console]::OutputEncoding=[Text.Encoding]::UTF8; $d = (Get-Date).ToString('yyyy-MM-dd'); $p = 'd:\\Claude\\NEX\\devlog\\' + $d + '.md'; if (-not (Test-Path -LiteralPath $p)) { Write-Output ('提醒：今天还没有写开发日志 devlog/' + $d + '.md，请按 CLAUDE.md 规则更新后再结束会话。') }\"",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  }
+}
