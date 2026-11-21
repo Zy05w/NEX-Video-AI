@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# 第三方引擎与模型（体积大，按需下载）
+engines/
+
+# 用户自行下载的第三方参考源码（不属于本项目）
+Real-ESRGAN-main/
+Practical-RIFE/
+
+# 构建产物
+dist/
+build/work/
+build/nex/
+*.spec.bak
+
+# 本地数据与日志
+*.log
+logs/
+*.db
+*.sqlite3
+
+# 测试产物
+.test/
+
+# IDE
+.idea/
+.vscode/
