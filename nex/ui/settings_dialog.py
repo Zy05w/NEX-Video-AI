@@ -10,12 +10,12 @@ from qfluentwidgets import (
     LineEdit,
     MessageBoxBase,
     PushButton,
-    SpinBox,
     SubtitleLabel,
 )
 
 from .. import APP_VERSION
 from ..app_config import AppConfig
+from .widgets import make_spin_box
 
 ENCODERS = ["auto", "x264", "nvenc"]
 ENCODER_LABELS = [
@@ -64,14 +64,14 @@ class SettingsDialog(MessageBoxBase):
         self.gpuBox.addItems([f"GPU {config.gpu_id}（自动）"])
         form.addRow(BodyLabel("显卡选择", form_host), self.gpuBox)
 
-        self.daysBox = SpinBox(form_host)
-        self.daysBox.setRange(1, 365)
-        self.daysBox.setValue(config.log_keep_days)
+        self.daysBox = make_spin_box(
+            form_host, 1, 365, config.log_keep_days
+        )
         form.addRow(BodyLabel("日志保留天数", form_host), self.daysBox)
 
-        self.tempBox = SpinBox(form_host)
-        self.tempBox.setRange(0, 100)
-        self.tempBox.setValue(int(round(config.temp_limit)))
+        self.tempBox = make_spin_box(
+            form_host, 0, 100, int(round(config.temp_limit))
+        )
         form.addRow(BodyLabel("温度保护上限 (°C)", form_host), self.tempBox)
 
         self.viewLayout.addWidget(form_host)

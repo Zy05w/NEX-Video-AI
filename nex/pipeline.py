@@ -463,7 +463,7 @@ def run_pipeline(
             logger.log("错误", str(error))
             raise error
         setattr(exc, "log_path", str(logger.path))
-        logger.log("错误", str(exc))
+        logger.log("取消", "任务已取消")
         raise
     except (EngineError, PipelineError) as exc:
         setattr(exc, "log_path", str(logger.path))

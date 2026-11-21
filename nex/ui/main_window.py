@@ -20,6 +20,7 @@ from qfluentwidgets import (
 from .. import APP_NAME
 from ..app_config import AppConfig, config_dir
 from ..db import TaskRepository
+from ..logger import cleanup_old_logs
 from ..pipeline import cleanup_stale_temp
 from ..task import Task, TaskParams, TaskStatus, new_task
 from ..worker import PipelineWorker
@@ -34,6 +35,7 @@ class MainWindow(QMainWindow):
         self.config = AppConfig.load()
         self.repo = repo if repo is not None else TaskRepository()
         cleanup_stale_temp()
+        cleanup_old_logs(self.config.log_keep_days)
         recovered = self.repo.recover_running()
         self._selected_task_id: str | None = None
 

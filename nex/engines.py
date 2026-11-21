@@ -237,7 +237,8 @@ def run_process(
     interval: float = 0.4,
 ) -> None:
     log_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(log_path, "ab") as log_file:
+    engine_log = log_path.with_name(f"{log_path.stem}.engine.log")
+    with open(engine_log, "ab") as log_file:
         try:
             proc = subprocess.Popen(
                 cmd,
@@ -272,7 +273,7 @@ def run_process(
             f"引擎执行失败（退出码 {proc.returncode}）",
             command=cmd,
             returncode=proc.returncode,
-            log_tail=_tail(log_path),
+            log_tail=_tail(engine_log),
         )
 
 

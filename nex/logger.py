@@ -3,11 +3,31 @@
 from __future__ import annotations
 
 import threading
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Callable, Optional
 
 from .app_config import config_dir
+
+
+def cleanup_old_logs(days: int, log_dir: Path | None = None) -> int:
+    """删除超过保留天数的任务日志。"""
+    if days <= 0:
+        return 0
+    base = log_dir if log_dir is not None else config_dir() / "logs"
+    if not base.exists():
+        return 0
+    cutoff = time.time() - days * 86400
+    removed = 0
+    for path in base.glob("*.log"):
+        try:
+            if path.stat().st_mtime < cutoff:
+                path.unlink()
+                removed += 1
+        except OSError:
+            continue
+    return removed
 
 
 class TaskLogger:
@@ -24,6 +44,11 @@ class TaskLogger:
         self.on_line = on_line
         try:
             self.path.write_text("", encoding="utf-8")
+        except OSError:
+            pass
+        engine_log = self.path.with_name(f"{self.path.stem}.engine.log")
+        try:
+            engine_log.unlink()
         except OSError:
             pass
         self._fh = open(self.path, "a", encoding="utf-8", buffering=1)
