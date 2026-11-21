@@ -69,12 +69,17 @@ class SettingsDialog(MessageBoxBase):
         self.daysBox.setValue(config.log_keep_days)
         form.addRow(BodyLabel("日志保留天数", form_host), self.daysBox)
 
+        self.tempBox = SpinBox(form_host)
+        self.tempBox.setRange(0, 100)
+        self.tempBox.setValue(int(round(config.temp_limit)))
+        form.addRow(BodyLabel("温度保护上限 (°C)", form_host), self.tempBox)
+
         self.viewLayout.addWidget(form_host)
 
         about = CaptionLabel(
             f"版本 {APP_VERSION} · 开源组件：Real-ESRGAN（BSD-3）、RIFE（MIT）、"
             "FFmpeg（GPL v3）、PySide6（LGPLv3）、qfluentwidgets（MIT）\n"
-            "许可证文本见安装目录 licenses/。",
+            "许可证文本见安装目录 licenses/。温度保护上限设为 0 表示关闭。",
             self,
         )
         about.setStyleSheet("color: #6B7280;")
@@ -94,5 +99,6 @@ class SettingsDialog(MessageBoxBase):
         index = self.encoderBox.currentIndex()
         self.config.encoder = ENCODERS[index] if 0 <= index < len(ENCODERS) else "auto"
         self.config.log_keep_days = self.daysBox.value()
+        self.config.temp_limit = float(self.tempBox.value())
         self.config.save()
         super().accept()

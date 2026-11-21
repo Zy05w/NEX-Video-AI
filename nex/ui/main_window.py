@@ -1,11 +1,9 @@
-"""主窗口（S2：界面骨架 + 演示数据）。"""
+"""主窗口：任务队列、处理控制与日志。"""
 
 from __future__ import annotations
 
-import os
-from datetime import datetime
+from pathlib import Path
 
-from PySide6.QtCore import QTimer
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import QHBoxLayout, QMainWindow, QVBoxLayout, QWidget
 from qfluentwidgets import (
@@ -20,33 +18,41 @@ from qfluentwidgets import (
 )
 
 from .. import APP_NAME
-from ..app_config import AppConfig
-from .add_task_dialog import AddTaskDialog, NewTaskRequest
+from ..app_config import AppConfig, config_dir
+from ..db import TaskRepository
+from ..pipeline import cleanup_stale_temp
+from ..task import Task, TaskParams, TaskStatus, new_task
+from ..worker import PipelineWorker
+from .add_task_dialog import AddTaskDialog
 from .settings_dialog import SettingsDialog
-from .task_table import (
-    STATUS_CANCELLED,
-    STATUS_DONE,
-    STATUS_FAILED,
-    STATUS_PENDING,
-    STATUS_RUNNING,
-    TaskRow,
-    TaskTableWidget,
-)
+from .task_table import TaskTableWidget
 
 
 class MainWindow(QMainWindow):
-    def __init__(self):
+    def __init__(self, repo: TaskRepository | None = None):
         super().__init__()
         self.config = AppConfig.load()
+        self.repo = repo if repo is not None else TaskRepository()
+        cleanup_stale_temp()
+        recovered = self.repo.recover_running()
+        self._selected_task_id: str | None = None
+
         self.setWindowTitle(APP_NAME)
         self.resize(1200, 760)
         self.setMinimumSize(960, 600)
         self._build_ui()
-        self._load_demo_tasks()
+        self._load_tasks()
 
-        self._demo_timer = QTimer(self)
-        self._demo_timer.timeout.connect(self.table.advance_demo_progress)
-        self._demo_timer.start(700)
+        self.worker = PipelineWorker(self.repo, self)
+        self.worker.taskStarted.connect(self._on_task_started)
+        self.worker.taskProgress.connect(self._on_task_progress)
+        self.worker.taskLog.connect(self._on_task_log)
+        self.worker.taskFinished.connect(self._on_task_finished)
+
+        if recovered:
+            self.statusBar().showMessage(
+                f"已恢复 {recovered} 个未完成任务为等待中", 6000
+            )
 
     # ---------- 界面构建 ----------
     def _build_ui(self) -> None:
@@ -95,8 +101,9 @@ class MainWindow(QMainWindow):
         root.addWidget(toolbar)
 
         self.table = TaskTableWidget(central)
-        self.table.logMessage.connect(self._on_task_log)
         self.table.taskSelected.connect(self._on_task_selected)
+        self.table.cancelRequested.connect(self._on_cancel_requested)
+        self.table.retryRequested.connect(self._on_retry_requested)
         self.table.deleteRequested.connect(self._on_delete_requested)
         root.addWidget(self.table, 1)
 
@@ -111,7 +118,7 @@ class MainWindow(QMainWindow):
         clear_btn = PushButton(log_panel)
         clear_btn.setText("清空视图")
         clear_btn.setFixedHeight(28)
-        clear_btn.clicked.connect(self.logEdit_clear)
+        clear_btn.clicked.connect(self._clear_log_view)
         log_header.addWidget(self.logTitle)
         log_header.addStretch(1)
         log_header.addWidget(clear_btn)
@@ -125,121 +132,103 @@ class MainWindow(QMainWindow):
         log_layout.addWidget(self.logEdit)
         root.addWidget(log_panel)
 
-        self.statusBar().showMessage("演示模式（S2）：界面骨架，尚未接入真实 AI 处理")
+        self.statusBar().showMessage("就绪")
 
-    def _load_demo_tasks(self) -> None:
-        now = _now()
-        demos = [
-            TaskRow(
-                file_name="动漫01.mp4",
-                file_path=r"D:\Videos\动漫01.mp4",
-                status=STATUS_RUNNING,
-                progress=45,
-                summary="4K / 60fps",
-                logs=[
-                    f"{now} [探测] 1920×1080 · 23.98fps · 时长 24:00（演示）",
-                    f"{now} [抽帧] 完成，共 480 帧（演示）",
-                    f"{now} [超分] 120/480 帧（25%）（演示）",
-                ],
-            ),
-            TaskRow(
-                file_name="旅拍.mp4",
-                file_path=r"D:\Videos\旅拍.mp4",
-                status=STATUS_PENDING,
-                progress=0,
-                summary="2x / 60fps",
-                logs=[f"{now} [等待] 已加入任务队列（演示）"],
-            ),
-            TaskRow(
-                file_name="电影.mp4",
-                file_path=r"D:\Videos\电影.mp4",
-                status=STATUS_DONE,
-                progress=100,
-                summary="4K / 不补帧",
-                logs=[
-                    f"{now} [合成] 输出完成：电影_4K.mp4（演示）",
-                    f"{now} [完成] 耗时 18 分 32 秒（演示）",
-                ],
-            ),
-            TaskRow(
-                file_name="旧番.mp4",
-                file_path=r"D:\Videos\旧番.mp4",
-                status=STATUS_FAILED,
-                progress=25,
-                summary="2x / 2x",
-                logs=[f"{now} [错误] 引擎退出码 1：显存不足（演示）"],
-            ),
-            TaskRow(
-                file_name="演唱会.mp4",
-                file_path=r"D:\Videos\演唱会.mp4",
-                status=STATUS_CANCELLED,
-                progress=10,
-                summary="4K / 120fps",
-                logs=[f"{now} [取消] 任务已取消（演示）"],
-            ),
-        ]
-        for task in demos:
+    def _load_tasks(self) -> None:
+        tasks = self.repo.list_all()
+        for task in tasks:
             self.table.add_task(task)
-        self.table.selectRow(0)
+        if tasks:
+            self.table.selectRow(0)
+            self._on_task_selected(tasks[0])
+        self.statusBar().showMessage(f"就绪 · 共 {len(tasks)} 个任务")
 
-    # ---------- 事件 ----------
-    def _on_task_selected(self, task) -> None:
-        if task is None:
-            self.logTitle.setText("日志 · 未选择任务")
-            self.logEdit.clear()
-            return
-        self.logTitle.setText(f"日志 · {task.file_name}")
-        self.logEdit.clear()
-        for line in task.logs[-300:]:
-            self.logEdit.append(line)
-
-    def _on_task_log(self, task, line: str) -> None:
-        if self.table.current_task() is task:
-            self.logEdit.append(line)
-
-    def logEdit_clear(self) -> None:
-        self.logEdit.clear()
-
+    # ---------- 任务操作 ----------
     def _on_add_task(self) -> None:
         dialog = AddTaskDialog(self)
         if not dialog.exec() or dialog.request is None:
             return
         request = dialog.request
-        summary = self._summary(request)
+        added: list[Task] = []
         for path in request.files:
-            task = TaskRow(
-                file_name=os.path.basename(path),
-                file_path=path,
-                status=STATUS_RUNNING if request.start_now else STATUS_PENDING,
-                progress=5 if request.start_now else 0,
-                summary=summary,
-                logs=[],
+            params = TaskParams(
+                input_path=path,
+                output_dir=request.output_dir or self.config.output_dir,
+                sr_enabled=request.sr_enabled,
+                sr_model=request.sr_model,
+                sr_scale=request.sr_scale,
+                sr_height=request.sr_height,
+                fi_enabled=request.fi_enabled,
+                fi_model=request.fi_model,
+                fi_mult=request.fi_mult,
+                fi_fps=request.fi_fps,
+                encoder=self.config.encoder,
+                gpu_id=self.config.gpu_id,
+                temp_limit=self.config.temp_limit,
             )
-            task.logs.append(f"{_now()} [添加] 已加入任务队列（演示数据）")
-            if request.start_now:
-                task.logs.append(f"{_now()} [开始] 开始处理（演示数据）")
+            task = new_task(params)
+            self.repo.add(task)
             self.table.add_task(task)
+            added.append(task)
+        if not added:
+            return
         self.table.selectRow(self.table.rowCount() - 1)
-        self.statusBar().showMessage(
-            f"已添加 {len(request.files)} 个任务（演示数据）", 4000
-        )
+        if request.start_now:
+            for task in added:
+                self.worker.enqueue(task.id)
+        self.statusBar().showMessage(f"已添加 {len(added)} 个任务", 4000)
 
     def _on_start_all(self) -> None:
-        count = self.table.start_all()
-        if count:
-            self.statusBar().showMessage(f"已开始 {count} 个任务（演示数据）", 4000)
+        pending = self.repo.list_pending()
+        for task in pending:
+            self.worker.enqueue(task.id)
+        if pending:
+            self.statusBar().showMessage(f"已开始 {len(pending)} 个任务", 4000)
         else:
-            self.statusBar().showMessage("没有可开始的任务", 3000)
-        current = self.table.current_task()
-        if current is not None:
-            self._on_task_selected(current)
+            self.statusBar().showMessage("没有等待中的任务", 3000)
 
-    def _on_settings(self) -> None:
-        SettingsDialog(self.config, self).exec()
-
-    def _on_delete_requested(self, index: int) -> None:
-        task = self.table.task_at(index)
+    def _on_cancel_requested(self, task_id: str) -> None:
+        task = self.table.task_by_id(task_id)
         if task is None:
+            return
+        if task.status == TaskStatus.RUNNING:
+            self.worker.cancel_task(task_id)
+            self.statusBar().showMessage("正在取消任务...", 3000)
+        elif task.status == TaskStatus.PENDING:
+            task.status = TaskStatus.CANCELLED
+            task.stage = "已取消"
+            self.repo.update(task)
+            self.table.update_task(task)
+            self.statusBar().showMessage(f"已取消：{task.file_name}", 4000)
+
+    def _on_retry_requested(self, task_id: str) -> None:
+        task = self.repo.get(task_id)
+        if task is None or task.status not in (
+            TaskStatus.FAILED, TaskStatus.CANCELLED
+        ):
+            return
+        task.status = TaskStatus.PENDING
+        task.progress = 0
+        task.stage = ""
+        task.error = ""
+        task.output_path = ""
+        task.started_at = None
+        task.finished_at = None
+        self.repo.update(task)
+        self.table.update_task(task)
+        self.worker.enqueue(task.id)
+        self.statusBar().showMessage(f"已重新加入队列：{task.file_name}", 4000)
+
+    def _on_delete_requested(self, task_id: str) -> None:
+        task = self.table.task_by_id(task_id)
+        if task is None:
+            return
+        if task.status == TaskStatus.RUNNING:
+            MessageBox(
+                "无法删除",
+                "任务正在处理中，请先取消后再删除。",
+                self,
+            ).exec()
             return
         box = MessageBox(
             "删除任务记录",
@@ -247,30 +236,96 @@ class MainWindow(QMainWindow):
             self,
         )
         if box.exec():
-            self.table.remove_task(index)
-            if self.table.rowCount() == 0:
-                self._on_task_selected(None)
-            else:
-                self.table.selectRow(min(index, self.table.rowCount() - 1))
+            self.repo.delete(task_id)
+            self.table.remove_task(task_id)
+            if self._selected_task_id == task_id:
+                self._selected_task_id = None
+                self.logTitle.setText("日志 · 未选择任务")
+                self.logEdit.clear()
+            self.statusBar().showMessage("已删除任务记录", 3000)
 
-    # ---------- 工具 ----------
-    @staticmethod
-    def _summary(request: NewTaskRequest) -> str:
-        if request.sr_enabled:
-            sr = "超分" if request.resolution == "原始" else request.resolution
+    def _on_settings(self) -> None:
+        SettingsDialog(self.config, self).exec()
+
+    # ---------- 工作线程信号 ----------
+    def _on_task_started(self, task_id: str) -> None:
+        task = self.repo.get(task_id)
+        if task is None:
+            return
+        self.table.update_task(task)
+        self.statusBar().showMessage(f"正在处理：{task.file_name}")
+        if task_id == self._selected_task_id:
+            self.logTitle.setText(f"日志 · {task.file_name}")
+
+    def _on_task_progress(
+        self, task_id: str, percent: int, stage: str, message: str
+    ) -> None:
+        self.table.set_progress(task_id, percent, stage)
+        if task_id == self._selected_task_id:
+            self.statusBar().showMessage(f"处理中：{stage} · {percent}%")
+
+    def _on_task_log(self, task_id: str, line: str) -> None:
+        if task_id == self._selected_task_id:
+            self.logEdit.append(line)
+
+    def _on_task_finished(self, task_id: str, outcome: str, message: str) -> None:
+        task = self.repo.get(task_id)
+        if task is None:
+            return
+        self.table.update_task(task)
+        if outcome == "done":
+            text = f"已完成：{task.file_name}"
+        elif outcome == "failed":
+            text = f"失败：{task.file_name} — {message[:80]}"
         else:
-            sr = "不超分"
-        if request.fi_enabled:
-            if request.fps in ("2x", "4x"):
-                fi = request.fps
-            elif request.fps == "原始":
-                fi = "补帧"
-            else:
-                fi = f"{request.fps}fps"
-        else:
-            fi = "不补帧"
-        return f"{sr} / {fi}"
+            text = f"已取消：{task.file_name}"
+        self.statusBar().showMessage(text, 10000)
+        if task_id == self._selected_task_id:
+            self._show_task_log(task)
 
+    # ---------- 日志 ----------
+    def _on_task_selected(self, task: Task) -> None:
+        self._selected_task_id = task.id
+        latest = self.repo.get(task.id) or task
+        self._show_task_log(latest)
 
-def _now() -> str:
-    return datetime.now().strftime("%H:%M:%S")
+    def _show_task_log(self, task: Task) -> None:
+        self.logTitle.setText(f"日志 · {task.file_name}")
+        self.logEdit.clear()
+        path = (
+            Path(task.log_path)
+            if task.log_path
+            else config_dir() / "logs" / f"{task.id}.log"
+        )
+        lines: list[str] = []
+        try:
+            if path.exists():
+                lines = path.read_text(
+                    encoding="utf-8", errors="replace"
+                ).splitlines()
+        except OSError:
+            lines = []
+        if not lines and task.error:
+            lines = [f"[错误] {task.error}"]
+        if not lines:
+            lines = [f"（暂无日志）目标参数：{task.summary}"]
+        for line in lines[-300:]:
+            self.logEdit.append(line)
+
+    def _clear_log_view(self) -> None:
+        self.logEdit.clear()
+
+    # ---------- 关闭 ----------
+    def closeEvent(self, event) -> None:
+        if self.worker.is_busy:
+            box = MessageBox(
+                "退出软件",
+                "有任务正在处理，退出将停止当前任务。确定退出吗？",
+                self,
+            )
+            if not box.exec():
+                event.ignore()
+                return
+        self.worker.stop()
+        self.worker.wait(10000)
+        event.accept()

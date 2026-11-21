@@ -22,14 +22,14 @@ SR_MODELS = [
     ("写实通用", "realesrgan-x4plus"),
     ("动漫插画", "realesrgan-x4plus-anime"),
 ]
-RESOLUTIONS = ["原始", "2x", "3x", "4x", "1080p", "2K", "4K"]
+RESOLUTIONS = ["2x", "3x", "4x", "1080p", "2K", "4K"]
 FI_MODELS = [
     ("rife-v4.6（推荐）", "rife-v4.6"),
     ("rife-anime（动漫）", "rife-anime"),
     ("rife-HD", "rife-HD"),
     ("rife-UHD", "rife-UHD"),
 ]
-FPS_OPTIONS = ["原始", "2x", "4x", "60", "120"]
+FPS_OPTIONS = ["2x", "4x", "60", "120"]
 
 VIDEO_FILTER = (
     "视频文件 (*.mp4 *.mkv *.mov *.avi *.webm *.flv *.ts *.m4v);;所有文件 (*.*)"
@@ -42,10 +42,12 @@ class NewTaskRequest:
     output_dir: str = ""
     sr_enabled: bool = True
     sr_model: str = "realesr-animevideov3"
-    resolution: str = "2x"
+    sr_scale: int | None = 2
+    sr_height: int | None = None
     fi_enabled: bool = True
     fi_model: str = "rife-v4.6"
-    fps: str = "2x"
+    fi_mult: int | None = 2
+    fi_fps: float | None = None
     start_now: bool = True
 
 
@@ -100,7 +102,7 @@ class AddTaskDialog(MessageBoxBase):
         self.srModel.addItems([text for text, _ in SR_MODELS])
         self.srRes = ComboBox(form_host)
         self.srRes.addItems(RESOLUTIONS)
-        self.srRes.setCurrentIndex(1)
+        self.srRes.setCurrentIndex(0)
         sr_row = QWidget(form_host)
         sr_layout = QHBoxLayout(sr_row)
         sr_layout.setContentsMargins(0, 0, 0, 0)
@@ -117,7 +119,7 @@ class AddTaskDialog(MessageBoxBase):
         self.fiModel.addItems([text for text, _ in FI_MODELS])
         self.fiFps = ComboBox(form_host)
         self.fiFps.addItems(FPS_OPTIONS)
-        self.fiFps.setCurrentIndex(1)
+        self.fiFps.setCurrentIndex(0)
         fi_row = QWidget(form_host)
         fi_layout = QHBoxLayout(fi_row)
         fi_layout.setContentsMargins(0, 0, 0, 0)
@@ -180,15 +182,29 @@ class AddTaskDialog(MessageBoxBase):
         return True
 
     def accept(self) -> None:
+        resolution = self.srRes.currentText()
+        if resolution in ("2x", "3x", "4x"):
+            sr_scale, sr_height = int(resolution[0]), None
+        else:
+            sr_scale, sr_height = None, {"1080p": 1080, "2K": 1440, "4K": 2160}[resolution]
+
+        fps_text = self.fiFps.currentText()
+        if fps_text in ("2x", "4x"):
+            fi_mult, fi_fps = int(fps_text[0]), None
+        else:
+            fi_mult, fi_fps = None, float(fps_text)
+
         self.request = NewTaskRequest(
             files=list(self._files),
             output_dir=self.outEdit.text().strip(),
             sr_enabled=self.srSwitch.isChecked(),
             sr_model=SR_MODELS[self.srModel.currentIndex()][1],
-            resolution=self.srRes.currentText(),
+            sr_scale=sr_scale,
+            sr_height=sr_height,
             fi_enabled=self.fiSwitch.isChecked(),
             fi_model=FI_MODELS[self.fiModel.currentIndex()][1],
-            fps=self.fiFps.currentText(),
+            fi_mult=fi_mult,
+            fi_fps=fi_fps,
             start_now=self.startCheck.isChecked(),
         )
         super().accept()

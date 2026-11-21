@@ -60,6 +60,7 @@ class EncodeOptions:
 @dataclass
 class PipelineOptions:
     input_path: Path
+    task_id: str | None = None
     output_dir: Path | None = None
     output_path: Path | None = None
     sr: SROptions = field(default_factory=SROptions)
@@ -181,6 +182,27 @@ def _choose_output(options: PipelineOptions, info: MediaInfo) -> Path:
     return candidate
 
 
+def cleanup_stale_temp(max_age_hours: float = 24.0) -> int:
+    """清理异常退出遗留的临时目录（默认只清理 24 小时前的）。"""
+    root = Path(tempfile.gettempdir()) / "NEX"
+    if not root.exists():
+        return 0
+    cutoff = time.time() - max_age_hours * 3600
+    removed = 0
+    try:
+        entries = list(root.iterdir())
+    except OSError:
+        return 0
+    for child in entries:
+        try:
+            if child.is_dir() and child.stat().st_mtime < cutoff:
+                shutil.rmtree(child, ignore_errors=True)
+                removed += 1
+        except OSError:
+            continue
+    return removed
+
+
 def _check_cancel(cancel) -> None:
     if cancel is not None and cancel.is_set():
         raise CancelledError("任务已取消")
@@ -190,11 +212,12 @@ def run_pipeline(
     options: PipelineOptions,
     on_progress: ProgressCallback = None,
     cancel: threading.Event | None = None,
+    on_log: Optional[Callable[[str], None]] = None,
 ) -> PipelineResult:
     started = time.time()
     cancel = cancel or threading.Event()
-    task_id = uuid.uuid4().hex[:12]
-    logger = TaskLogger(task_id)
+    task_id = options.task_id or uuid.uuid4().hex[:12]
+    logger = TaskLogger(task_id, on_line=on_log)
     temp_root = Path(tempfile.gettempdir()) / "NEX" / task_id
     monitor: gpu.GpuMonitor | None = None
 
