@@ -7,6 +7,7 @@ from qfluentwidgets import (
     BodyLabel,
     CaptionLabel,
     ComboBox,
+    FluentIcon as FIF,
     LineEdit,
     MessageBoxBase,
     PushButton,
@@ -15,6 +16,7 @@ from qfluentwidgets import (
 
 from .. import APP_VERSION
 from ..app_config import AppConfig
+from .tutorial import TutorialDialog
 from .widgets import make_spin_box
 
 ENCODERS = ["auto", "x264", "nvenc"]
@@ -76,6 +78,17 @@ class SettingsDialog(MessageBoxBase):
 
         self.viewLayout.addWidget(form_host)
 
+        tutorial_row = QWidget(self)
+        tutorial_layout = QHBoxLayout(tutorial_row)
+        tutorial_layout.setContentsMargins(0, 0, 0, 0)
+        self.tutorialBtn = PushButton(tutorial_row)
+        self.tutorialBtn.setText("使用教程")
+        self.tutorialBtn.setIcon(FIF.INFO)
+        self.tutorialBtn.clicked.connect(self._show_tutorial)
+        tutorial_layout.addWidget(self.tutorialBtn)
+        tutorial_layout.addStretch(1)
+        self.viewLayout.addWidget(tutorial_row)
+
         about = CaptionLabel(
             f"版本 {APP_VERSION} · 开源组件：Real-ESRGAN（BSD-3）、RIFE（MIT）、"
             "FFmpeg（GPL v3）、PySide6（LGPLv3）、qfluentwidgets（MIT）\n"
@@ -93,6 +106,9 @@ class SettingsDialog(MessageBoxBase):
         path = QFileDialog.getExistingDirectory(self, "选择默认输出文件夹")
         if path:
             self.outEdit.setText(path)
+
+    def _show_tutorial(self) -> None:
+        TutorialDialog(self).exec()
 
     def accept(self) -> None:
         self.config.output_dir = self.outEdit.text().strip()
