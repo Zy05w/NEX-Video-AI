@@ -3,7 +3,7 @@
 Windows 11 桌面端 **AI 视频超分 + 补帧**软件（商用产品，类似 SVFI / Topaz Video AI）。
 技术栈：Python 3.11 + PySide6 + qfluentwidgets；引擎为 FFmpeg + realesrgan-ncnn-vulkan + rife-ncnn-vulkan（Vulkan / NVIDIA GPU）。
 
-当前阶段：**S2 界面骨架（待用户确认）**
+当前阶段：**S3 处理管线（待用户确认）**
 
 ## 标准文件索引
 
@@ -35,7 +35,8 @@ Windows 11 桌面端 **AI 视频超分 + 补帧**软件（商用产品，类似 
 
 | 用途 | 命令 | 可用阶段 |
 |---|---|---|
-| 启动界面 | `python -m nex` 或双击 `启动NEX.bat` | S2 起 |
-| 命令行处理 | `python -m nex.cli` | S3 起 |
-| 运行测试 | `python -m pytest` | S3 起 |
+| 启动界面 | `.venv\Scripts\python.exe -m nex` 或双击 `启动NEX.bat` | S2 起 |
+| 命令行处理 | `.venv\Scripts\python.exe -m nex.cli 输入.mp4 --sr realesr-animevideov3 --sr-scale 2` | S3 起 |
+| 命令行补帧 | `.venv\Scripts\python.exe -m nex.cli 输入.mp4 --fi rife-v4.6 --fi-mult 2` | S3 起 |
+| 运行测试 | `.venv\Scripts\python.exe -m pytest -q` | S3 起 |
 | 打包 | `pyinstaller build/nex.spec` | S6 起 |
