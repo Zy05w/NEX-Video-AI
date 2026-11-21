@@ -75,6 +75,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--gpu", type=int, default=0, help="GPU 编号（默认 0）")
     parser.add_argument("--keep-temp", action="store_true", help="保留临时文件")
     parser.add_argument(
+        "--temp-limit", type=float, default=88.0,
+        help="显卡温度保护上限（°C，0 表示关闭；默认 88）",
+    )
+    parser.add_argument(
         "--cancel-after", type=float, default=None,
         help=argparse.SUPPRESS,
     )
@@ -117,6 +121,8 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--fi-mult 与 --fi-fps 只能二选一")
     if not 0 <= args.crf <= 51:
         parser.error("--crf 必须在 0-51 之间")
+    if args.temp_limit < 0 or args.temp_limit > 100:
+        parser.error("--temp-limit 必须在 0-100 之间")
 
     cancel = threading.Event()
 
@@ -163,6 +169,8 @@ def main(argv: list[str] | None = None) -> int:
         ),
         gpu_id=args.gpu,
         keep_temp=args.keep_temp,
+        temp_guard=args.temp_limit > 0,
+        temp_limit=args.temp_limit if args.temp_limit > 0 else 88.0,
     )
 
     try:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 from datetime import datetime
 from pathlib import Path
 
@@ -19,13 +20,15 @@ class TaskLogger:
         except OSError:
             pass
         self._fh = open(self.path, "a", encoding="utf-8", buffering=1)
+        self._lock = threading.Lock()
 
     def log(self, stage: str, message: str) -> str:
         line = f"{datetime.now().strftime('%H:%M:%S')} [{stage}] {message}"
-        try:
-            self._fh.write(line + "\n")
-        except (OSError, ValueError):
-            pass
+        with self._lock:
+            try:
+                self._fh.write(line + "\n")
+            except (OSError, ValueError):
+                pass
         return line
 
     def close(self) -> None:

@@ -41,3 +41,5 @@ Windows 11 桌面端 **AI 视频超分 + 补帧**软件（商用产品，类似 
 | 拖入视频试用 | 把视频拖到 `拖入视频测试.bat` 上，按菜单选择 | S3 起 |
 | 运行测试 | `.venv\Scripts\python.exe -m pytest -q` | S3 起 |
 | 打包 | `pyinstaller build/nex.spec` | S6 起 |
+
+> 显卡温度保护默认开启（88°C 上限）；CLI 可加 `--temp-limit 90` 调整，`--temp-limit 0` 关闭。

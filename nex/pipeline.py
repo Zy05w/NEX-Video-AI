@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Optional
 
-from . import engines
+from . import engines, gpu
 from .engines import CancelledError, EngineError, MediaInfo
 from .logger import TaskLogger
 
@@ -67,6 +67,8 @@ class PipelineOptions:
     encode: EncodeOptions = field(default_factory=EncodeOptions)
     gpu_id: int = 0
     keep_temp: bool = False
+    temp_guard: bool = True
+    temp_limit: float = 88.0
 
 
 @dataclass
@@ -194,6 +196,7 @@ def run_pipeline(
     task_id = uuid.uuid4().hex[:12]
     logger = TaskLogger(task_id)
     temp_root = Path(tempfile.gettempdir()) / "NEX" / task_id
+    monitor: gpu.GpuMonitor | None = None
 
     result_info: dict = {}
     try:
@@ -209,6 +212,21 @@ def run_pipeline(
             f"{info.fps:.3f}fps · {info.duration:.2f}s · "
             f"音轨 {info.audio_codec or '无'}",
         )
+
+        if options.temp_guard:
+            status = gpu.query_gpu()
+            if status is not None:
+                logger.log(
+                    "温度",
+                    f"显卡 {status.name} · 初始 {status.temperature}°C · "
+                    f"保护上限 {options.temp_limit:g}°C",
+                )
+                monitor = gpu.GpuMonitor(
+                    logger, cancel, limit=options.temp_limit
+                )
+                monitor.start()
+            else:
+                logger.log("温度", "未检测到 nvidia-smi，跳过温度监控")
 
         if not options.sr.enabled and not options.fi.enabled:
             raise PipelineError("请至少开启超分或补帧中的一项")
@@ -411,14 +429,27 @@ def run_pipeline(
             "frames": final_frames,
             "elapsed": elapsed,
         }
-    except (EngineError, PipelineError, CancelledError) as exc:
-        try:
-            setattr(exc, "log_path", str(logger.path))
-        except Exception:
-            pass
+    except CancelledError as exc:
+        if monitor is not None and monitor.overheated:
+            error = PipelineError(
+                f"显卡温度过高（{monitor.max_temp}°C，保护上限 "
+                f"{options.temp_limit:g}°C），已安全停止任务。"
+                "请检查散热后重试。"
+            )
+            setattr(error, "log_path", str(logger.path))
+            logger.log("错误", str(error))
+            raise error
+        setattr(exc, "log_path", str(logger.path))
+        logger.log("错误", str(exc))
+        raise
+    except (EngineError, PipelineError) as exc:
+        setattr(exc, "log_path", str(logger.path))
         logger.log("错误", str(exc))
         raise
     finally:
+        if monitor is not None:
+            monitor.stop()
+            monitor.join(timeout=2)
         logger.close()
         if not options.keep_temp:
             shutil.rmtree(temp_root, ignore_errors=True)
