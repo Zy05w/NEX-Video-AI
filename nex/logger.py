@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Callable, Optional
 
 from .app_config import config_dir
+from .i18n import t
 
 
 def cleanup_old_logs(days: int, log_dir: Path | None = None) -> int:
@@ -55,7 +56,7 @@ class TaskLogger:
         self._lock = threading.Lock()
 
     def log(self, stage: str, message: str) -> str:
-        line = f"{datetime.now().strftime('%H:%M:%S')} [{stage}] {message}"
+        line = f"{datetime.now().strftime('%H:%M:%S')} [{t(stage)}] {message}"
         with self._lock:
             try:
                 self._fh.write(line + "\n")

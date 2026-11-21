@@ -8,6 +8,7 @@ import time
 from dataclasses import dataclass
 from typing import Optional
 
+from .i18n import t
 from .logger import TaskLogger
 
 CREATE_NO_WINDOW = 0x08000000
@@ -114,15 +115,24 @@ class GpuMonitor(threading.Thread):
             )
             self.logger.log(
                 "温度",
-                f"GPU {status.temperature}°C · 占用 {status.utilization}% · "
-                f"功耗 {status.power}W · 显存 {status.memory_used}MiB",
+                t(
+                    "GPU {temp}°C · 占用 {util}% · 功耗 {power}W · 显存 {mem}MiB",
+                    temp=status.temperature,
+                    util=status.utilization,
+                    power=status.power,
+                    mem=status.memory_used,
+                ),
             )
             if status.temperature >= self.limit:
                 self.overheated = True
                 self.logger.log(
                     "温度",
-                    f"温度达到 {status.temperature}°C（保护上限 "
-                    f"{self.limit:g}°C），正在安全停止任务",
+                    t(
+                        "温度达到 {temp}°C（保护上限 {limit}°C），"
+                        "正在安全停止任务",
+                        temp=status.temperature,
+                        limit=f"{self.limit:g}",
+                    ),
                 )
                 self.cancel_event.set()
                 return

@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
 )
 from qfluentwidgets import CaptionLabel, ProgressBar, PushButton, TableWidget
 
+from ..i18n import t
 from ..task import Task, TaskStatus
 
 STATUS_COLORS = {
@@ -39,7 +40,7 @@ class TaskTableWidget(TableWidget):
         self._tasks: list[Task] = []
         self._progress_widgets: dict[str, tuple[ProgressBar, CaptionLabel]] = {}
         self.setColumnCount(len(self.HEADERS))
-        self.setHorizontalHeaderLabels(self.HEADERS)
+        self.setHorizontalHeaderLabels([t(header) for header in self.HEADERS])
         self.verticalHeader().hide()
         self.setBorderVisible(True)
         self.setBorderRadius(8)
@@ -47,7 +48,7 @@ class TaskTableWidget(TableWidget):
         self.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.setSelectionMode(QAbstractItemView.SingleSelection)
         self.setEditTriggers(QAbstractItemView.NoEditTriggers)
-        self.setColumnWidth(1, 90)
+        self.setColumnWidth(1, 120)
         self.setColumnWidth(2, 200)
         self.setColumnWidth(4, 170)
         header = self.horizontalHeader()
@@ -69,7 +70,7 @@ class TaskTableWidget(TableWidget):
         name_item.setToolTip(task.params.input_path)
         self.setItem(row, 0, name_item)
 
-        status_item = QTableWidgetItem(task.status.value)
+        status_item = QTableWidgetItem(t(task.status.value))
         status_item.setTextAlignment(Qt.AlignCenter)
         status_item.setForeground(QColor(STATUS_COLORS.get(task.status, "#1F2329")))
         self.setItem(row, 1, status_item)
@@ -152,7 +153,7 @@ class TaskTableWidget(TableWidget):
 
         if task.status in (TaskStatus.PENDING, TaskStatus.RUNNING):
             cancel_btn = PushButton(widget)
-            cancel_btn.setText("取消")
+            cancel_btn.setText(t("取消"))
             cancel_btn.setFixedHeight(28)
             cancel_btn.clicked.connect(
                 lambda _=False, task_id=task.id: self.cancelRequested.emit(task_id)
@@ -160,7 +161,7 @@ class TaskTableWidget(TableWidget):
             layout.addWidget(cancel_btn)
         elif task.status in (TaskStatus.FAILED, TaskStatus.CANCELLED):
             retry_btn = PushButton(widget)
-            retry_btn.setText("重试")
+            retry_btn.setText(t("重试"))
             retry_btn.setFixedHeight(28)
             retry_btn.clicked.connect(
                 lambda _=False, task_id=task.id: self.retryRequested.emit(task_id)
@@ -168,7 +169,7 @@ class TaskTableWidget(TableWidget):
             layout.addWidget(retry_btn)
 
         delete_btn = PushButton(widget)
-        delete_btn.setText("删除")
+        delete_btn.setText(t("删除"))
         delete_btn.setFixedHeight(28)
         delete_btn.clicked.connect(
             lambda _=False, task_id=task.id: self.deleteRequested.emit(task_id)
@@ -183,7 +184,7 @@ class TaskTableWidget(TableWidget):
         task = self._tasks[index]
         status_item = self.item(index, 1)
         if status_item:
-            status_item.setText(task.status.value)
+            status_item.setText(t(task.status.value))
             status_item.setForeground(
                 QColor(STATUS_COLORS.get(task.status, "#1F2329"))
             )

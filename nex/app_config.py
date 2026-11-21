@@ -23,6 +23,7 @@ class AppConfig:
     gpu_id: int = 0
     log_keep_days: int = 30
     temp_limit: float = 88.0  # °C；0 表示关闭温度保护
+    language: str = "zh"  # zh / en
 
     @classmethod
     def load(cls) -> "AppConfig":
@@ -42,6 +43,8 @@ class AppConfig:
                 cfg.log_keep_days = max(1, min(365, data["log_keep_days"]))
             if isinstance(data.get("temp_limit"), (int, float)):
                 cfg.temp_limit = max(0.0, min(100.0, float(data["temp_limit"])))
+            if data.get("language") in ("zh", "en"):
+                cfg.language = data["language"]
         return cfg
 
     def save(self) -> None:

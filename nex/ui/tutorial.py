@@ -5,6 +5,8 @@ from __future__ import annotations
 from PySide6.QtGui import QColor, QFont, QTextCursor
 from qfluentwidgets import MessageBoxBase, SubtitleLabel, TextEdit
 
+from ..i18n import get_language, t
+
 TUTORIAL_MARKDOWN = """
 # NEX 视频增强 · 使用教程
 
@@ -72,17 +74,90 @@ TUTORIAL_MARKDOWN = """
 版本 0.1.0 · 如需更详细说明，请查看项目 docs 目录
 """
 
+TUTORIAL_MARKDOWN_EN = """
+# NEX Video Enhancer · User Guide
+
+## 1. Quick Start
+
+1. Click **Add Task** at the top right
+2. Choose one or more videos (or drag them into the window)
+3. Set upscaling, frame interpolation and output folder as needed
+4. Click **Add**; enable **Start immediately after adding** to begin
+5. When finished, find the new file ending with `_NEX` in the source folder
+
+> Start with a 10–30 second clip before processing long videos.
+
+## 2. AI Upscaling
+
+- Anime video: **Anime Video (Recommended)**
+- Live action: **Realistic / General**
+- Anime illustration: **Anime Illustration**
+- Resolution:
+  - `2x / 3x / 4x`: scale factor
+  - `1080p / 2K / 4K`: target quality
+- Upscaling is slow; 4K output takes longer
+
+## 3. AI Frame Interpolation
+
+- Recommended model: `rife-v4.6` (included in the bundled ncnn package)
+- `2x / 4x`: double / quadruple the frame rate
+- `60 / 120`: target frame rate (e.g. 24fps → 60fps)
+- Anime videos can use `rife-anime`
+
+## 4. Task Queue
+
+- Tasks are processed one at a time for GPU stability
+- Pending: can cancel
+- Processing: can cancel; retry after cancellation
+- Failed / Cancelled: retry or delete the record
+- Deleting a record never deletes the video file
+- Records survive restart; running tasks return to Pending
+
+## 5. Logs & Settings
+
+- The log panel shows details for the selected task
+- Settings: default output folder, encoder, GPU, log retention, temperature limit, language
+- Temperature guard checks the GPU every 5 seconds and stops safely above the limit (default 88°C)
+- Set the temperature limit to 0 to disable it
+
+## 6. FAQ
+
+- **Slow?** AI processing is much slower than transcoding; 4K is slower
+- **Out of VRAM?** Lower the resolution/scale, or disable interpolation
+- **Where is the output?** Same folder as the source, filename ends with `_NEX`
+- **Supported formats?** mp4 / mkv / mov / avi / webm and other common formats
+- **Close while processing?** Cancel first; closing stops the current task
+- **GPU safety?** Normal compute load, no overclocking; a temperature guard is included
+- **No audio?** The app copies source audio when possible; check the source file
+- **Encoding slow?** x264 software encoding is used by default; NVENC requires driver 610+
+- **Language?** Change it in Settings, then restart the app to apply
+
+## 7. Tips
+
+- Keep the laptop plugged in and well ventilated for long jobs
+- Back up important source videos first
+- Use the project backup script regularly
+
+---
+Version 0.1.0 · For more details, see the project docs folder
+"""
+
 
 class TutorialDialog(MessageBoxBase):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.titleLabel = SubtitleLabel("使用教程", self)
+        self.titleLabel = SubtitleLabel(t("使用教程"), self)
         self.viewLayout.addWidget(self.titleLabel)
 
         self.textEdit = TextEdit(self)
         self.textEdit.setReadOnly(True)
         self.textEdit.setFont(QFont("Microsoft YaHei UI", 10))
-        self.textEdit.setMarkdown(TUTORIAL_MARKDOWN)
+        markdown = (
+            TUTORIAL_MARKDOWN_EN
+            if get_language() == "en"
+            else TUTORIAL_MARKDOWN
+        )
+        self.textEdit.setMarkdown(markdown)
         self.textEdit.selectAll()
         self.textEdit.setTextColor(QColor("#1F2329"))
         self.textEdit.moveCursor(QTextCursor.Start)
@@ -93,6 +168,6 @@ class TutorialDialog(MessageBoxBase):
         )
         self.viewLayout.addWidget(self.textEdit)
 
-        self.yesButton.setText("知道了")
+        self.yesButton.setText(t("知道了"))
         self.hideCancelButton()
         self.widget.setMinimumSize(780, 620)

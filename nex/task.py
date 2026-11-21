@@ -9,6 +9,8 @@ from dataclasses import asdict, dataclass, field
 from enum import Enum
 from pathlib import Path
 
+from .i18n import t
+
 
 class TaskStatus(str, Enum):
     PENDING = "等待中"
@@ -48,18 +50,18 @@ class TaskParams:
             elif self.sr_scale:
                 sr = f"{self.sr_scale}x"
             else:
-                sr = "超分"
+                sr = t("超分")
         else:
-            sr = "不超分"
+            sr = t("不超分")
         if self.fi_enabled:
             if self.fi_mult:
                 fi = f"{self.fi_mult}x"
             elif self.fi_fps:
                 fi = f"{self.fi_fps:g}fps"
             else:
-                fi = "补帧"
+                fi = t("补帧")
         else:
-            fi = "不补帧"
+            fi = t("不补帧")
         return f"{sr} / {fi}"
 
 

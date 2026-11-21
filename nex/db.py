@@ -8,6 +8,7 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from .app_config import config_dir
+from .i18n import t
 from .task import Task, TaskStatus
 
 SCHEMA = """
@@ -128,7 +129,7 @@ def _row_to_task(row: sqlite3.Row) -> Task:
     except (ValueError, TypeError):
         file_name, params = "", None
     if params is None:
-        raise ValueError(f"任务数据损坏：{row['id']}")
+        raise ValueError(t("任务数据损坏：{id}", id=row["id"]))
     try:
         status = TaskStatus(row["status"])
     except ValueError:

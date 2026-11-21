@@ -20,6 +20,7 @@ from qfluentwidgets import (
 from .. import APP_NAME
 from ..app_config import AppConfig, config_dir
 from ..db import TaskRepository
+from ..i18n import t
 from ..logger import cleanup_old_logs
 from ..pipeline import cleanup_stale_temp
 from ..task import Task, TaskParams, TaskStatus, new_task
@@ -30,16 +31,20 @@ from .task_table import TaskTableWidget
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, repo: TaskRepository | None = None):
+    def __init__(
+        self,
+        repo: TaskRepository | None = None,
+        config: AppConfig | None = None,
+    ):
         super().__init__()
-        self.config = AppConfig.load()
+        self.config = config if config is not None else AppConfig.load()
         self.repo = repo if repo is not None else TaskRepository()
         cleanup_stale_temp()
         cleanup_old_logs(self.config.log_keep_days)
         recovered = self.repo.recover_running()
         self._selected_task_id: str | None = None
 
-        self.setWindowTitle(APP_NAME)
+        self.setWindowTitle(t(APP_NAME))
         self.resize(1200, 760)
         self.setMinimumSize(960, 600)
         self._build_ui()
@@ -53,7 +58,7 @@ class MainWindow(QMainWindow):
 
         if recovered:
             self.statusBar().showMessage(
-                f"已恢复 {recovered} 个未完成任务为等待中", 6000
+                t("已恢复 {count} 个未完成任务为等待中", count=recovered), 6000
             )
 
     # ---------- 界面构建 ----------
@@ -74,8 +79,8 @@ class MainWindow(QMainWindow):
 
         title_box = QVBoxLayout()
         title_box.setSpacing(0)
-        title = SubtitleLabel(APP_NAME, toolbar)
-        subtitle = CaptionLabel("AI 视频超分 · 补帧", toolbar)
+        title = SubtitleLabel(t(APP_NAME), toolbar)
+        subtitle = CaptionLabel(t("AI 视频超分 · 补帧"), toolbar)
         subtitle.setStyleSheet("color: #6B7280;")
         title_box.addWidget(title)
         title_box.addWidget(subtitle)
@@ -83,17 +88,17 @@ class MainWindow(QMainWindow):
         bar.addStretch(1)
 
         self.addBtn = PrimaryPushButton(toolbar)
-        self.addBtn.setText("添加任务")
+        self.addBtn.setText(t("添加任务"))
         self.addBtn.setIcon(FIF.ADD)
         self.addBtn.clicked.connect(self._on_add_task)
 
         self.startBtn = PushButton(toolbar)
-        self.startBtn.setText("开始全部")
+        self.startBtn.setText(t("开始全部"))
         self.startBtn.setIcon(FIF.PLAY)
         self.startBtn.clicked.connect(self._on_start_all)
 
         self.settingsBtn = PushButton(toolbar)
-        self.settingsBtn.setText("设置")
+        self.settingsBtn.setText(t("设置"))
         self.settingsBtn.setIcon(FIF.SETTING)
         self.settingsBtn.clicked.connect(self._on_settings)
 
@@ -116,9 +121,9 @@ class MainWindow(QMainWindow):
         log_layout.setSpacing(6)
 
         log_header = QHBoxLayout()
-        self.logTitle = StrongBodyLabel("日志 · 未选择任务", log_panel)
+        self.logTitle = StrongBodyLabel(t("日志 · 未选择任务"), log_panel)
         clear_btn = PushButton(log_panel)
-        clear_btn.setText("清空视图")
+        clear_btn.setText(t("清空视图"))
         clear_btn.setFixedHeight(28)
         clear_btn.clicked.connect(self._clear_log_view)
         log_header.addWidget(self.logTitle)
@@ -134,7 +139,7 @@ class MainWindow(QMainWindow):
         log_layout.addWidget(self.logEdit)
         root.addWidget(log_panel)
 
-        self.statusBar().showMessage("就绪")
+        self.statusBar().showMessage(t("就绪"))
 
     def _load_tasks(self) -> None:
         tasks = self.repo.list_all()
@@ -143,7 +148,9 @@ class MainWindow(QMainWindow):
         if tasks:
             self.table.selectRow(0)
             self._on_task_selected(tasks[0])
-        self.statusBar().showMessage(f"就绪 · 共 {len(tasks)} 个任务")
+        self.statusBar().showMessage(
+            t("就绪 · 共 {count} 个任务", count=len(tasks))
+        )
 
     # ---------- 任务操作 ----------
     def _on_add_task(self) -> None:
@@ -178,16 +185,20 @@ class MainWindow(QMainWindow):
         if request.start_now:
             for task in added:
                 self.worker.enqueue(task.id)
-        self.statusBar().showMessage(f"已添加 {len(added)} 个任务", 4000)
+        self.statusBar().showMessage(
+            t("已添加 {count} 个任务", count=len(added)), 4000
+        )
 
     def _on_start_all(self) -> None:
         pending = self.repo.list_pending()
         for task in pending:
             self.worker.enqueue(task.id)
         if pending:
-            self.statusBar().showMessage(f"已开始 {len(pending)} 个任务", 4000)
+            self.statusBar().showMessage(
+                t("已开始 {count} 个任务", count=len(pending)), 4000
+            )
         else:
-            self.statusBar().showMessage("没有等待中的任务", 3000)
+            self.statusBar().showMessage(t("没有等待中的任务"), 3000)
 
     def _on_cancel_requested(self, task_id: str) -> None:
         task = self.table.task_by_id(task_id)
@@ -195,13 +206,15 @@ class MainWindow(QMainWindow):
             return
         if task.status == TaskStatus.RUNNING:
             self.worker.cancel_task(task_id)
-            self.statusBar().showMessage("正在取消任务...", 3000)
+            self.statusBar().showMessage(t("正在取消任务..."), 3000)
         elif task.status == TaskStatus.PENDING:
             task.status = TaskStatus.CANCELLED
             task.stage = "已取消"
             self.repo.update(task)
             self.table.update_task(task)
-            self.statusBar().showMessage(f"已取消：{task.file_name}", 4000)
+            self.statusBar().showMessage(
+                t("已取消：{name}", name=task.file_name), 4000
+            )
 
     def _on_retry_requested(self, task_id: str) -> None:
         task = self.repo.get(task_id)
@@ -219,7 +232,9 @@ class MainWindow(QMainWindow):
         self.repo.update(task)
         self.table.update_task(task)
         self.worker.enqueue(task.id)
-        self.statusBar().showMessage(f"已重新加入队列：{task.file_name}", 4000)
+        self.statusBar().showMessage(
+            t("已重新加入队列：{name}", name=task.file_name), 4000
+        )
 
     def _on_delete_requested(self, task_id: str) -> None:
         task = self.table.task_by_id(task_id)
@@ -227,14 +242,17 @@ class MainWindow(QMainWindow):
             return
         if task.status == TaskStatus.RUNNING:
             MessageBox(
-                "无法删除",
-                "任务正在处理中，请先取消后再删除。",
+                t("无法删除"),
+                t("任务正在处理中，请先取消后再删除。"),
                 self,
             ).exec()
             return
         box = MessageBox(
-            "删除任务记录",
-            f"确定删除「{task.file_name}」的记录吗？\n仅删除记录，不会删除视频文件。",
+            t("删除任务记录"),
+            t(
+                "确定删除「{name}」的记录吗？\n仅删除记录，不会删除视频文件。",
+                name=task.file_name,
+            ),
             self,
         )
         if box.exec():
@@ -242,12 +260,33 @@ class MainWindow(QMainWindow):
             self.table.remove_task(task_id)
             if self._selected_task_id == task_id:
                 self._selected_task_id = None
-                self.logTitle.setText("日志 · 未选择任务")
+                self.logTitle.setText(t("日志 · 未选择任务"))
                 self.logEdit.clear()
-            self.statusBar().showMessage("已删除任务记录", 3000)
+            self.statusBar().showMessage(t("已删除任务记录"), 3000)
 
     def _on_settings(self) -> None:
+        old_language = self.config.language
         SettingsDialog(self.config, self).exec()
+        if self.config.language == old_language:
+            return
+        if self.worker.is_busy:
+            MessageBox(
+                t("语言已更改"),
+                t("有任务正在处理，请在任务结束后手动重启软件使语言生效。"),
+                self,
+            ).exec()
+            return
+        box = MessageBox(
+            t("语言已更改"),
+            t("语言设置将在重启软件后生效。是否立即重启？"),
+            self,
+        )
+        if box.exec():
+            self.worker.stop()
+            self.worker.wait(5000)
+            from ..app import restart_app
+
+            restart_app()
 
     # ---------- 工作线程信号 ----------
     def _on_task_started(self, task_id: str) -> None:
@@ -255,16 +294,24 @@ class MainWindow(QMainWindow):
         if task is None:
             return
         self.table.update_task(task)
-        self.statusBar().showMessage(f"正在处理：{task.file_name}")
+        self.statusBar().showMessage(
+            t("正在处理：{name}", name=task.file_name)
+        )
         if task_id == self._selected_task_id:
-            self.logTitle.setText(f"日志 · {task.file_name}")
+            self.logTitle.setText(t("日志 · {name}", name=task.file_name))
 
     def _on_task_progress(
         self, task_id: str, percent: int, stage: str, message: str
     ) -> None:
         self.table.set_progress(task_id, percent, stage)
         if task_id == self._selected_task_id:
-            self.statusBar().showMessage(f"处理中：{stage} · {percent}%")
+            self.statusBar().showMessage(
+                t(
+                    "处理中：{stage} · {percent}%",
+                    stage=t(stage),
+                    percent=percent,
+                )
+            )
 
     def _on_task_log(self, task_id: str, line: str) -> None:
         if task_id == self._selected_task_id:
@@ -276,11 +323,15 @@ class MainWindow(QMainWindow):
             return
         self.table.update_task(task)
         if outcome == "done":
-            text = f"已完成：{task.file_name}"
+            text = t("已完成：{name}", name=task.file_name)
         elif outcome == "failed":
-            text = f"失败：{task.file_name} — {message[:80]}"
+            text = t(
+                "失败：{name} — {message}",
+                name=task.file_name,
+                message=message[:80],
+            )
         else:
-            text = f"已取消：{task.file_name}"
+            text = t("已取消：{name}", name=task.file_name)
         self.statusBar().showMessage(text, 10000)
         if task_id == self._selected_task_id:
             self._show_task_log(task)
@@ -292,7 +343,7 @@ class MainWindow(QMainWindow):
         self._show_task_log(latest)
 
     def _show_task_log(self, task: Task) -> None:
-        self.logTitle.setText(f"日志 · {task.file_name}")
+        self.logTitle.setText(t("日志 · {name}", name=task.file_name))
         self.logEdit.clear()
         path = (
             Path(task.log_path)
@@ -310,7 +361,9 @@ class MainWindow(QMainWindow):
         if not lines and task.error:
             lines = [f"[错误] {task.error}"]
         if not lines:
-            lines = [f"（暂无日志）目标参数：{task.summary}"]
+            lines = [
+                t("（暂无日志）目标参数：{summary}", summary=task.summary)
+            ]
         for line in lines[-300:]:
             self.logEdit.append(line)
 
@@ -321,8 +374,8 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event) -> None:
         if self.worker.is_busy:
             box = MessageBox(
-                "退出软件",
-                "有任务正在处理，退出将停止当前任务。确定退出吗？",
+                t("退出软件"),
+                t("有任务正在处理，退出将停止当前任务。确定退出吗？"),
                 self,
             )
             if not box.exec():

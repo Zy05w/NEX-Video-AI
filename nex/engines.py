@@ -18,6 +18,7 @@ from fractions import Fraction
 from pathlib import Path
 from typing import Callable, Iterable, Optional
 
+from .i18n import t
 from .logger import TaskLogger
 
 CREATE_NO_WINDOW = 0x08000000 if os.name == "nt" else 0
@@ -43,9 +44,19 @@ class EngineError(RuntimeError):
         self.log_tail = log_tail
 
     def short(self) -> str:
+        stage = t(self.stage)
         if self.returncode is None:
-            return f"{self.stage}失败：{self.message}"
-        return f"{self.stage}失败（退出码 {self.returncode}）：{self.message}"
+            return t(
+                "{stage}失败：{message}",
+                stage=stage,
+                message=self.message,
+            )
+        return t(
+            "{stage}失败（退出码 {code}）：{message}",
+            stage=stage,
+            code=self.returncode,
+            message=self.message,
+        )
 
 
 class CancelledError(RuntimeError):
@@ -127,7 +138,7 @@ def _parse_rate(value: str | None) -> float:
 def probe(path: str | Path) -> MediaInfo:
     path = Path(path)
     if not path.exists():
-        raise EngineError("探测", f"文件不存在：{path}")
+        raise EngineError("探测", t("文件不存在：{path}", path=path))
     cmd = [
         str(ffprobe_exe()),
         "-v", "error",
@@ -146,17 +157,17 @@ def probe(path: str | Path) -> MediaInfo:
     )
     if proc.returncode != 0:
         raise EngineError(
-            "探测", "无法读取视频信息", command=cmd,
+            "探测", t("无法读取视频信息"), command=cmd,
             returncode=proc.returncode, log_tail=(proc.stderr or "")[-1200:],
         )
     try:
         data = json.loads(proc.stdout)
     except ValueError:
-        raise EngineError("探测", "视频信息解析失败", command=cmd)
+        raise EngineError("探测", t("视频信息解析失败"), command=cmd)
     streams = data.get("streams") or []
     video = next((s for s in streams if s.get("codec_type") == "video"), None)
     if video is None:
-        raise EngineError("探测", "文件中没有视频流")
+        raise EngineError("探测", t("文件中没有视频流"))
     audio = next((s for s in streams if s.get("codec_type") == "audio"), None)
     duration = 0.0
     for candidate in (
@@ -173,7 +184,7 @@ def probe(path: str | Path) -> MediaInfo:
         video.get("r_frame_rate")
     )
     if fps <= 0:
-        raise EngineError("探测", "无法识别视频帧率")
+        raise EngineError("探测", t("无法识别视频帧率"))
     return MediaInfo(
         path=path,
         duration=duration,
@@ -248,7 +259,9 @@ def run_process(
                 creationflags=CREATE_NO_WINDOW,
             )
         except OSError as exc:
-            raise EngineError(stage, f"无法启动引擎：{exc}", command=cmd)
+            raise EngineError(
+                stage, t("无法启动引擎：{error}", error=exc), command=cmd
+            )
         try:
             while proc.poll() is None:
                 if cancel is not None and cancel.is_set():
@@ -257,7 +270,7 @@ def run_process(
                         proc.wait(timeout=10)
                     except subprocess.TimeoutExpired:
                         proc.kill()
-                    raise CancelledError("任务已取消")
+                    raise CancelledError(t("任务已取消"))
                 if poll is not None:
                     try:
                         poll()
@@ -266,11 +279,11 @@ def run_process(
                 time.sleep(interval)
         except KeyboardInterrupt:
             _kill_tree(proc.pid)
-            raise CancelledError("任务已取消")
+            raise CancelledError(t("任务已取消"))
     if proc.returncode != 0:
         raise EngineError(
             stage,
-            f"引擎执行失败（退出码 {proc.returncode}）",
+            t("引擎执行失败（退出码 {code}）", code=proc.returncode),
             command=cmd,
             returncode=proc.returncode,
             log_tail=_tail(engine_log),
@@ -422,7 +435,9 @@ def encode_video(
     try:
         output_path.parent.mkdir(parents=True, exist_ok=True)
     except OSError as exc:
-        raise EngineError("合成", f"无法创建输出目录：{exc}")
+        raise EngineError(
+            "合成", t("无法创建输出目录：{error}", error=exc)
+        )
     try:
         progress_file.unlink()
     except OSError:

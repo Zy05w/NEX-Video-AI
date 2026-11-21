@@ -14,6 +14,7 @@ from typing import Callable, Optional
 
 from . import engines, gpu
 from .engines import CancelledError, EngineError, MediaInfo
+from .i18n import t
 from .logger import TaskLogger
 
 ProgressCallback = Optional[Callable[[str, float, str], None]]
@@ -94,9 +95,9 @@ def _plan_sr(sr: SROptions, info: MediaInfo) -> dict | None:
     if not sr.enabled:
         return None
     if sr.model not in SR_SCALES:
-        raise PipelineError(f"未知的超分模型：{sr.model}")
+        raise PipelineError(t("未知的超分模型：{model}", model=sr.model))
     if sr.scale is not None and sr.target_height is not None:
-        raise PipelineError("超分倍数与目标高度只能二选一")
+        raise PipelineError(t("超分倍数与目标高度只能二选一"))
 
     requested = sr.scale
     if requested is None and sr.target_height:
@@ -137,30 +138,36 @@ def _plan_sr(sr: SROptions, info: MediaInfo) -> dict | None:
 def _plan_fi(fi: FIOptions, info: MediaInfo) -> tuple[int, float, str]:
     """返回 (插值遍数, 输出帧率, 说明)。"""
     if not fi.enabled:
-        return 0, info.fps, "未启用"
+        return 0, info.fps, t("未启用")
     if fi.model not in FI_MODELS:
-        raise PipelineError(f"未知的补帧模型：{fi.model}")
+        raise PipelineError(t("未知的补帧模型：{model}", model=fi.model))
     if fi.multiplier is not None and fi.target_fps is not None:
-        raise PipelineError("补帧倍数与目标帧率只能二选一")
+        raise PipelineError(t("补帧倍数与目标帧率只能二选一"))
 
     if fi.multiplier is not None:
         if fi.multiplier not in (2, 4):
-            raise PipelineError("补帧倍数仅支持 2x 或 4x")
+            raise PipelineError(t("补帧倍数仅支持 2x 或 4x"))
         passes = 1 if fi.multiplier == 2 else 2
         return passes, info.fps * fi.multiplier, f"{fi.multiplier}x"
 
     if fi.target_fps is not None:
         target = float(fi.target_fps)
         if target <= info.fps + 1e-6:
-            return 0, info.fps, f"目标 {target:g}fps 不高于源帧率，跳过"
+            return 0, info.fps, t(
+                "目标 {target}fps 不高于源帧率，跳过", target=f"{target:g}"
+            )
         passes = 0
         fps = info.fps
         while fps < target - 1e-6 and passes < 3:
             fps *= 2
             passes += 1
         if fps + 1e-6 < target:
-            return passes, fps, f"目标 {target:g}fps 超过 8x，已限制为 {fps:g}fps"
-        return passes, target, f"目标 {target:g}fps"
+            return passes, fps, t(
+                "目标 {target}fps 超过 8x，已限制为 {fps}fps",
+                target=f"{target:g}",
+                fps=f"{fps:g}",
+            )
+        return passes, target, t("目标 {target}fps", target=f"{target:g}")
 
     return 1, info.fps * 2, "2x"
 
@@ -172,7 +179,7 @@ def _choose_output(options: PipelineOptions, info: MediaInfo) -> Path:
     try:
         base.mkdir(parents=True, exist_ok=True)
     except OSError as exc:
-        raise PipelineError(f"无法创建输出目录：{exc}")
+        raise PipelineError(t("无法创建输出目录：{error}", error=exc))
     stem = info.path.stem
     candidate = base / f"{stem}_NEX.mp4"
     index = 1
@@ -205,7 +212,7 @@ def cleanup_stale_temp(max_age_hours: float = 24.0) -> int:
 
 def _check_cancel(cancel) -> None:
     if cancel is not None and cancel.is_set():
-        raise CancelledError("任务已取消")
+        raise CancelledError(t("任务已取消"))
 
 
 def run_pipeline(
@@ -225,15 +232,23 @@ def run_pipeline(
     try:
         missing = engines.check_engines()
         if missing:
-            raise PipelineError("缺少引擎文件：\n" + "\n".join(missing))
+            raise PipelineError(
+                t("缺少引擎文件：\n{files}", files="\n".join(missing))
+            )
 
         input_path = Path(options.input_path)
         info = engines.probe(input_path)
         logger.log(
             "探测",
-            f"{input_path.name} · {info.width}x{info.height} · "
-            f"{info.fps:.3f}fps · {info.duration:.2f}s · "
-            f"音轨 {info.audio_codec or '无'}",
+            t(
+                "{name} · {width}x{height} · {fps}fps · {duration}s · 音轨 {audio}",
+                name=input_path.name,
+                width=info.width,
+                height=info.height,
+                fps=f"{info.fps:.3f}",
+                duration=f"{info.duration:.2f}",
+                audio=info.audio_codec or t("无"),
+            ),
         )
 
         if options.temp_guard:
@@ -241,38 +256,66 @@ def run_pipeline(
             if status is not None:
                 logger.log(
                     "温度",
-                    f"显卡 {status.name} · 初始 {status.temperature}°C · "
-                    f"保护上限 {options.temp_limit:g}°C",
+                    t(
+                        "显卡 {name} · 初始 {temp}°C · 保护上限 {limit}°C",
+                        name=status.name,
+                        temp=status.temperature,
+                        limit=f"{options.temp_limit:g}",
+                    ),
                 )
                 monitor = gpu.GpuMonitor(
                     logger, cancel, limit=options.temp_limit
                 )
                 monitor.start()
             else:
-                logger.log("温度", "未检测到 nvidia-smi，跳过温度监控")
+                logger.log(
+                    "温度", t("未检测到 nvidia-smi，跳过温度监控")
+                )
 
         if not options.sr.enabled and not options.fi.enabled:
-            raise PipelineError("请至少开启超分或补帧中的一项")
+            raise PipelineError(t("请至少开启超分或补帧中的一项"))
 
         sr_plan = _plan_sr(options.sr, info)
         fi_passes, final_fps, fi_note = _plan_fi(options.fi, info)
         have_sr = sr_plan is not None and not sr_plan["skip"]
         have_fi = fi_passes > 0
         if not have_sr and not have_fi:
-            raise PipelineError("没有可执行的增强步骤（超分被跳过且补帧未生效）")
+            raise PipelineError(
+                t("没有可执行的增强步骤（超分被跳过且补帧未生效）")
+            )
 
         if sr_plan is not None:
+            if sr_plan["skip"]:
+                plan_message = t(
+                    "超分：{model}，运行倍数 {scale}x（跳过 AI，直接缩放），"
+                    "输出 {width}x{height}",
+                    model=options.sr.model,
+                    scale=sr_plan["scale"],
+                    width=sr_plan["final_w"],
+                    height=sr_plan["final_h"],
+                )
+            else:
+                plan_message = t(
+                    "超分：{model}，运行倍数 {scale}x，输出 {width}x{height}",
+                    model=options.sr.model,
+                    scale=sr_plan["scale"],
+                    width=sr_plan["final_w"],
+                    height=sr_plan["final_h"],
+                )
+            logger.log("规划", plan_message)
+        if options.fi.enabled:
             logger.log(
                 "规划",
-                f"超分：{options.sr.model}，运行倍数 {sr_plan['scale']}x"
-                + ("（跳过 AI，直接缩放）" if sr_plan["skip"] else "")
-                + f"，输出 {sr_plan['final_w']}x{sr_plan['final_h']}",
+                t(
+                    "补帧：{model}，{note}，插值 {passes} 遍，输出 {fps}fps",
+                    model=options.fi.model,
+                    note=fi_note,
+                    passes=fi_passes,
+                    fps=f"{final_fps:.3f}",
+                ),
             )
-        logger.log(
-            "规划",
-            f"补帧：{options.fi.model if options.fi.enabled else '未启用'}，"
-            f"{fi_note}，插值 {fi_passes} 遍，输出 {final_fps:.3f}fps",
-        )
+        else:
+            logger.log("规划", t("补帧：未启用"))
 
         weights: dict[str, float] = {"抽帧": 5.0}
         if have_sr:
@@ -299,18 +342,22 @@ def run_pipeline(
         # 1. 抽帧
         _check_cancel(cancel)
         frames_dir = temp_root / "frames_in"
-        emit("抽帧", 0.0, "开始")
-        logger.log("抽帧", "开始")
+        emit("抽帧", 0.0, t("开始"))
+        logger.log("抽帧", t("开始"))
         emit_started = time.time()
         frame_count = engines.extract_frames(
             input_path, frames_dir, info, logger.path, cancel,
             on_progress=lambda f: emit("抽帧", f, "读取中"),
         )
         if frame_count <= 0:
-            raise PipelineError("抽帧失败：没有生成任何帧")
+            raise PipelineError(t("抽帧失败：没有生成任何帧"))
         logger.log(
             "抽帧",
-            f"完成：{frame_count} 帧，耗时 {time.time() - emit_started:.1f}s",
+            t(
+                "完成：{count} 帧，耗时 {seconds}s",
+                count=frame_count,
+                seconds=f"{time.time() - emit_started:.1f}",
+            ),
         )
         emit("抽帧", 1.0, f"{frame_count} 帧")
         current_frames = frames_dir
@@ -323,9 +370,14 @@ def run_pipeline(
             scale = sr_plan["scale"]
             logger.log(
                 "超分",
-                f"开始：{options.sr.model} {scale}x，共 {frame_count_after} 帧",
+                t(
+                    "开始：{model} {scale}x，共 {count} 帧",
+                    model=options.sr.model,
+                    scale=scale,
+                    count=frame_count_after,
+                ),
             )
-            emit("超分", 0.0, "开始")
+            emit("超分", 0.0, t("开始"))
             stage_started = time.time()
 
             def sr_cb(fraction: float, total: int = frame_count_after) -> None:
@@ -336,10 +388,14 @@ def run_pipeline(
                 options.gpu_id, logger.path, cancel, frame_count_after, sr_cb,
             )
             if new_count <= 0:
-                raise PipelineError("超分失败：没有生成任何帧")
+                raise PipelineError(t("超分失败：没有生成任何帧"))
             logger.log(
                 "超分",
-                f"完成：{new_count} 帧，耗时 {time.time() - stage_started:.1f}s",
+                t(
+                    "完成：{count} 帧，耗时 {seconds}s",
+                    count=new_count,
+                    seconds=f"{time.time() - stage_started:.1f}",
+                ),
             )
             emit("超分", 1.0, f"{new_count} 帧")
             current_frames = sr_out
@@ -352,7 +408,12 @@ def run_pipeline(
                 fi_out = temp_root / f"frames_fi_{pass_index}"
                 logger.log(
                     "补帧",
-                    f"第 {pass_index}/{fi_passes} 遍开始：{frame_count_after} 帧",
+                    t(
+                        "第 {index}/{total} 遍开始：{count} 帧",
+                        index=pass_index,
+                        total=fi_passes,
+                        count=frame_count_after,
+                    ),
                 )
                 stage_started = time.time()
                 total_in = frame_count_after
@@ -370,11 +431,15 @@ def run_pipeline(
                     options.gpu_id, logger.path, cancel, total_in, fi_cb,
                 )
                 if new_count <= 0:
-                    raise PipelineError("补帧失败：没有生成任何帧")
+                    raise PipelineError(t("补帧失败：没有生成任何帧"))
                 logger.log(
                     "补帧",
-                    f"第 {pass_index} 遍完成：{new_count} 帧，"
-                    f"耗时 {time.time() - stage_started:.1f}s",
+                    t(
+                        "第 {index} 遍完成：{count} 帧，耗时 {seconds}s",
+                        index=pass_index,
+                        count=new_count,
+                        seconds=f"{time.time() - stage_started:.1f}",
+                    ),
                 )
                 current_frames = fi_out
                 frame_count_after = new_count
@@ -393,13 +458,19 @@ def run_pipeline(
             encoder = "x264"
             logger.log(
                 "合成",
-                "编码器 auto → x264（NVENC 需驱动 ≥610.00，暂用软件编码）",
+                t("编码器 auto → x264（NVENC 需驱动 ≥610.00，暂用软件编码）"),
             )
         logger.log(
             "合成",
-            f"开始：{final_w}x{final_h} @ {final_fps:.3f}fps，编码器 {encoder}",
+            t(
+                "开始：{width}x{height} @ {fps}fps，编码器 {encoder}",
+                width=final_w,
+                height=final_h,
+                fps=f"{final_fps:.3f}",
+                encoder=encoder,
+            ),
         )
-        emit("合成", 0.0, "开始")
+        emit("合成", 0.0, t("开始"))
         stage_started = time.time()
         progress_file = temp_root / "ffmpeg_encode_progress.txt"
         encode_args = dict(
@@ -424,16 +495,26 @@ def run_pipeline(
             engines.encode_video(encoder=encoder, **encode_args)
         except EngineError as exc:
             if encoder == "nvenc":
-                logger.log("合成", "NVENC 失败，自动回退 x264：" + exc.short())
+                logger.log(
+                    "合成",
+                    t(
+                        "NVENC 失败，自动回退 x264：{message}",
+                        message=exc.short(),
+                    ),
+                )
                 encoder = "x264"
                 engines.encode_video(encoder=encoder, **encode_args)
             else:
                 raise
         if not output_path.exists() or output_path.stat().st_size == 0:
-            raise PipelineError("合成失败：输出文件不存在或为空")
+            raise PipelineError(t("合成失败：输出文件不存在或为空"))
         logger.log(
             "合成",
-            f"完成：{output_path}，耗时 {time.time() - stage_started:.1f}s",
+            t(
+                "完成：{path}，耗时 {seconds}s",
+                path=output_path,
+                seconds=f"{time.time() - stage_started:.1f}",
+            ),
         )
         emit("合成", 1.0, str(output_path.name))
 
@@ -441,8 +522,14 @@ def run_pipeline(
         elapsed = time.time() - started
         logger.log(
             "完成",
-            f"总耗时 {elapsed:.1f}s · 输出 {final_w}x{final_h} @ "
-            f"{final_fps:.3f}fps · {final_frames} 帧",
+            t(
+                "总耗时 {seconds}s · 输出 {width}x{height} @ {fps}fps · {frames} 帧",
+                seconds=f"{elapsed:.1f}",
+                width=final_w,
+                height=final_h,
+                fps=f"{final_fps:.3f}",
+                frames=final_frames,
+            ),
         )
         result_info = {
             "output": output_path,
@@ -455,15 +542,18 @@ def run_pipeline(
     except CancelledError as exc:
         if monitor is not None and monitor.overheated:
             error = PipelineError(
-                f"显卡温度过高（{monitor.max_temp}°C，保护上限 "
-                f"{options.temp_limit:g}°C），已安全停止任务。"
-                "请检查散热后重试。"
+                t(
+                    "显卡温度过高（{temp}°C，保护上限 {limit}°C），"
+                    "已安全停止任务。请检查散热后重试。",
+                    temp=monitor.max_temp,
+                    limit=f"{options.temp_limit:g}",
+                )
             )
             setattr(error, "log_path", str(logger.path))
             logger.log("错误", str(error))
             raise error
         setattr(exc, "log_path", str(logger.path))
-        logger.log("取消", "任务已取消")
+        logger.log("取消", t("任务已取消"))
         raise
     except (EngineError, PipelineError) as exc:
         setattr(exc, "log_path", str(logger.path))

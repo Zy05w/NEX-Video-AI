@@ -11,6 +11,7 @@ from PySide6.QtCore import QThread, Signal
 
 from .db import TaskRepository
 from .engines import CancelledError, EngineError
+from .i18n import t
 from .pipeline import (
     EncodeOptions,
     FIOptions,
@@ -129,7 +130,7 @@ class PipelineWorker(QThread):
             task.finished_at = time.time()
             task.log_path = getattr(exc, "log_path", "") or task.log_path
             self.repo.update(task)
-            self.taskFinished.emit(task.id, "cancelled", "任务已取消")
+            self.taskFinished.emit(task.id, "cancelled", t("任务已取消"))
         except (EngineError, PipelineError) as exc:
             task.status = TaskStatus.FAILED
             task.stage = "失败"
@@ -141,7 +142,7 @@ class PipelineWorker(QThread):
         except Exception as exc:  # 防御：不应发生的内部错误
             task.status = TaskStatus.FAILED
             task.stage = "失败"
-            task.error = f"内部错误：{exc}"
+            task.error = t("内部错误：{error}", error=exc)
             task.finished_at = time.time()
             self.repo.update(task)
             self.taskFinished.emit(task.id, "failed", task.error)
