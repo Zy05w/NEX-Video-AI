@@ -1,24 +1,25 @@
-"""添加任务对话框（S2：表单与假数据录入）。"""
+"""添加任务对话框（原生 Qt）。"""
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from PySide6.QtWidgets import QFileDialog, QFormLayout, QHBoxLayout, QWidget
-from qfluentwidgets import (
-    BodyLabel,
-    CaptionLabel,
-    CheckBox,
-    ComboBox,
-    LineEdit,
-    MessageBoxBase,
-    PushButton,
-    SubtitleLabel,
-    SwitchButton,
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import (
+    QCheckBox,
+    QComboBox,
+    QFileDialog,
+    QFormLayout,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QPushButton,
+    QWidget,
 )
 
 from .. import engines
 from ..i18n import t
+from .base_dialog import BaseDialog
 
 SR_MODELS = [
     ("动漫视频（推荐）", "realesr-animevideov3"),
@@ -35,6 +36,7 @@ FI_MODELS = [
 ]
 FPS_OPTIONS = ["2x", "4x", "60", "120"]
 
+
 @dataclass
 class NewTaskRequest:
     files: list[str] = field(default_factory=list)
@@ -50,27 +52,26 @@ class NewTaskRequest:
     start_now: bool = True
 
 
-class AddTaskDialog(MessageBoxBase):
+class AddTaskDialog(BaseDialog):
     def __init__(self, parent=None):
-        super().__init__(parent)
+        super().__init__(t("添加任务"), parent)
         self.request: NewTaskRequest | None = None
         self._files: list[str] = []
-
-        self.titleLabel = SubtitleLabel(t("添加任务"), self)
-        self.viewLayout.addWidget(self.titleLabel)
+        self.setMinimumWidth(680)
 
         form_host = QWidget(self)
         form = QFormLayout(form_host)
         form.setContentsMargins(0, 0, 0, 0)
-        form.setHorizontalSpacing(12)
-        form.setVerticalSpacing(10)
+        form.setHorizontalSpacing(14)
+        form.setVerticalSpacing(12)
+        form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
+        form.setLabelAlignment(Qt.AlignLeft | Qt.AlignVCenter)
 
         # 视频文件
-        self.fileEdit = LineEdit(form_host)
+        self.fileEdit = QLineEdit(form_host)
         self.fileEdit.setReadOnly(True)
         self.fileEdit.setPlaceholderText(t("尚未选择视频文件"))
-        choose_btn = PushButton(form_host)
-        choose_btn.setText(t("选择视频..."))
+        choose_btn = QPushButton(t("选择视频..."), form_host)
         choose_btn.clicked.connect(self._choose_files)
         file_row = QWidget(form_host)
         file_layout = QHBoxLayout(file_row)
@@ -78,13 +79,12 @@ class AddTaskDialog(MessageBoxBase):
         file_layout.setSpacing(8)
         file_layout.addWidget(self.fileEdit, 1)
         file_layout.addWidget(choose_btn)
-        form.addRow(BodyLabel(t("视频文件"), form_host), file_row)
+        form.addRow(QLabel(t("视频文件"), form_host), file_row)
 
         # 输出位置
-        self.outEdit = LineEdit(form_host)
+        self.outEdit = QLineEdit(form_host)
         self.outEdit.setPlaceholderText(t("默认：源视频同目录"))
-        browse_btn = PushButton(form_host)
-        browse_btn.setText(t("浏览..."))
+        browse_btn = QPushButton(t("浏览..."), form_host)
         browse_btn.clicked.connect(self._choose_output_dir)
         out_row = QWidget(form_host)
         out_layout = QHBoxLayout(out_row)
@@ -92,14 +92,14 @@ class AddTaskDialog(MessageBoxBase):
         out_layout.setSpacing(8)
         out_layout.addWidget(self.outEdit, 1)
         out_layout.addWidget(browse_btn)
-        form.addRow(BodyLabel(t("输出位置"), form_host), out_row)
+        form.addRow(QLabel(t("输出位置"), form_host), out_row)
 
         # AI 超分
-        self.srSwitch = SwitchButton(form_host)
+        self.srSwitch = QCheckBox(t("启用"), form_host)
         self.srSwitch.setChecked(True)
-        self.srModel = ComboBox(form_host)
+        self.srModel = QComboBox(form_host)
         self.srModel.addItems([t(text) for text, _ in SR_MODELS])
-        self.srRes = ComboBox(form_host)
+        self.srRes = QComboBox(form_host)
         self.srRes.addItems(RESOLUTIONS)
         self.srRes.setCurrentIndex(0)
         sr_row = QWidget(form_host)
@@ -109,12 +109,12 @@ class AddTaskDialog(MessageBoxBase):
         sr_layout.addWidget(self.srSwitch)
         sr_layout.addWidget(self.srModel, 1)
         sr_layout.addWidget(self.srRes)
-        form.addRow(BodyLabel(t("AI 超分"), form_host), sr_row)
+        form.addRow(QLabel(t("AI 超分"), form_host), sr_row)
 
         # AI 补帧
-        self.fiSwitch = SwitchButton(form_host)
+        self.fiSwitch = QCheckBox(t("启用"), form_host)
         self.fiSwitch.setChecked(True)
-        self.fiModel = ComboBox(form_host)
+        self.fiModel = QComboBox(form_host)
         pt_missing = bool(engines.check_practical_rife())
         self._fi_models = [
             (label, value)
@@ -122,7 +122,7 @@ class AddTaskDialog(MessageBoxBase):
             if value != engines.PRACTICAL_RIFE_MODEL or not pt_missing
         ]
         self.fiModel.addItems([t(text) for text, _ in self._fi_models])
-        self.fiFps = ComboBox(form_host)
+        self.fiFps = QComboBox(form_host)
         self.fiFps.addItems(FPS_OPTIONS)
         self.fiFps.setCurrentIndex(0)
         fi_row = QWidget(form_host)
@@ -132,30 +132,29 @@ class AddTaskDialog(MessageBoxBase):
         fi_layout.addWidget(self.fiSwitch)
         fi_layout.addWidget(self.fiModel, 1)
         fi_layout.addWidget(self.fiFps)
-        form.addRow(BodyLabel(t("AI 补帧"), form_host), fi_row)
+        form.addRow(QLabel(t("AI 补帧"), form_host), fi_row)
 
-        self.srSwitch.checkedChanged.connect(
+        self.srSwitch.toggled.connect(
             lambda on: (self.srModel.setEnabled(on), self.srRes.setEnabled(on))
         )
-        self.fiSwitch.checkedChanged.connect(
+        self.fiSwitch.toggled.connect(
             lambda on: (self.fiModel.setEnabled(on), self.fiFps.setEnabled(on))
         )
 
-        self.startCheck = CheckBox(form_host)
-        self.startCheck.setText(t("添加后立即开始"))
+        self.startCheck = QCheckBox(t("添加后立即开始"), form_host)
         self.startCheck.setChecked(True)
-        form.addRow(BodyLabel("", form_host), self.startCheck)
+        form.addRow(QLabel("", form_host), self.startCheck)
 
-        self.viewLayout.addWidget(form_host)
+        self.contentLayout.addWidget(form_host)
 
-        self.errorLabel = CaptionLabel("", self)
-        self.errorLabel.setStyleSheet("color: #E5484D;")
-        self.errorLabel.setVisible(False)
-        self.viewLayout.addWidget(self.errorLabel)
+        self.errorLabel = QLabel("", self)
+        self.errorLabel.setObjectName("errorLabel")
+        self.errorLabel.setWordWrap(True)
+        self.errorLabel.hide()
+        self.contentLayout.addWidget(self.errorLabel)
 
-        self.yesButton.setText(t("添加"))
+        self.okButton.setText(t("添加"))
         self.cancelButton.setText(t("取消"))
-        self.widget.setMinimumWidth(640)
 
     # ---------- 事件 ----------
     def _choose_files(self) -> None:
@@ -175,7 +174,7 @@ class AddTaskDialog(MessageBoxBase):
             self.fileEdit.setText(
                 t("已选择 {count} 个文件", count=len(files))
             )
-        self.errorLabel.setVisible(False)
+        self.errorLabel.hide()
 
     def _choose_output_dir(self) -> None:
         path = QFileDialog.getExistingDirectory(self, t("选择输出文件夹"))
@@ -189,10 +188,12 @@ class AddTaskDialog(MessageBoxBase):
         if not self.srSwitch.isChecked() and not self.fiSwitch.isChecked():
             self._show_error(t("请至少开启“超分”或“补帧”中的一项"))
             return False
-        self.errorLabel.setVisible(False)
+        self.errorLabel.hide()
         return True
 
     def accept(self) -> None:
+        if not self.validate():
+            return
         resolution = self.srRes.currentText()
         if resolution in ("2x", "3x", "4x"):
             sr_scale, sr_height = int(resolution[0]), None
@@ -222,4 +223,4 @@ class AddTaskDialog(MessageBoxBase):
 
     def _show_error(self, text: str) -> None:
         self.errorLabel.setText(text)
-        self.errorLabel.setVisible(True)
+        self.errorLabel.show()

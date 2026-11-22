@@ -1,4 +1,4 @@
-"""任务列表表格（真实任务模型）。"""
+"""任务列表表格（真实任务模型，原生 Qt）。"""
 
 from __future__ import annotations
 
@@ -8,10 +8,13 @@ from PySide6.QtWidgets import (
     QAbstractItemView,
     QHBoxLayout,
     QHeaderView,
+    QLabel,
+    QProgressBar,
+    QPushButton,
+    QTableWidget,
     QTableWidgetItem,
     QWidget,
 )
-from qfluentwidgets import CaptionLabel, ProgressBar, PushButton, TableWidget
 
 from ..i18n import t
 from ..task import Task, TaskStatus
@@ -25,7 +28,7 @@ STATUS_COLORS = {
 }
 
 
-class TaskTableWidget(TableWidget):
+class TaskTableWidget(QTableWidget):
     """任务表格：文件名 / 状态 / 进度 / 目标参数 / 操作。"""
 
     taskSelected = Signal(object)
@@ -38,20 +41,23 @@ class TaskTableWidget(TableWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._tasks: list[Task] = []
-        self._progress_widgets: dict[str, tuple[ProgressBar, CaptionLabel]] = {}
+        self._progress_widgets: dict[str, tuple[QProgressBar, QLabel]] = {}
         self.setColumnCount(len(self.HEADERS))
         self.setHorizontalHeaderLabels([t(header) for header in self.HEADERS])
-        self.verticalHeader().hide()
-        self.setBorderVisible(True)
-        self.setBorderRadius(8)
+        self.verticalHeader().setVisible(False)
         self.setShowGrid(False)
         self.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.setSelectionMode(QAbstractItemView.SingleSelection)
         self.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.setAlternatingRowColors(False)
+        self.setWordWrap(False)
+        self.setTextElideMode(Qt.ElideRight)
         self.setColumnWidth(1, 120)
         self.setColumnWidth(2, 200)
         self.setColumnWidth(4, 170)
         header = self.horizontalHeader()
+        header.setHighlightSections(False)
+        header.setStretchLastSection(False)
         header.setSectionResizeMode(0, QHeaderView.Stretch)
         header.setSectionResizeMode(1, QHeaderView.Fixed)
         header.setSectionResizeMode(2, QHeaderView.Fixed)
@@ -134,10 +140,12 @@ class TaskTableWidget(TableWidget):
         layout = QHBoxLayout(widget)
         layout.setContentsMargins(12, 0, 12, 0)
         layout.setSpacing(8)
-        bar = ProgressBar(widget, useAni=False)
+        bar = QProgressBar(widget)
+        bar.setRange(0, 100)
         bar.setValue(task.progress)
+        bar.setTextVisible(False)
         bar.setFixedHeight(8)
-        label = CaptionLabel(f"{task.progress}%", widget)
+        label = QLabel(f"{task.progress}%", widget)
         label.setFixedWidth(38)
         label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         layout.addWidget(bar, 1)
@@ -152,25 +160,22 @@ class TaskTableWidget(TableWidget):
         layout.setSpacing(6)
 
         if task.status in (TaskStatus.PENDING, TaskStatus.RUNNING):
-            cancel_btn = PushButton(widget)
-            cancel_btn.setText(t("取消"))
-            cancel_btn.setFixedHeight(28)
+            cancel_btn = QPushButton(t("取消"), widget)
+            cancel_btn.setObjectName("smallButton")
             cancel_btn.clicked.connect(
                 lambda _=False, task_id=task.id: self.cancelRequested.emit(task_id)
             )
             layout.addWidget(cancel_btn)
         elif task.status in (TaskStatus.FAILED, TaskStatus.CANCELLED):
-            retry_btn = PushButton(widget)
-            retry_btn.setText(t("重试"))
-            retry_btn.setFixedHeight(28)
+            retry_btn = QPushButton(t("重试"), widget)
+            retry_btn.setObjectName("smallButton")
             retry_btn.clicked.connect(
                 lambda _=False, task_id=task.id: self.retryRequested.emit(task_id)
             )
             layout.addWidget(retry_btn)
 
-        delete_btn = PushButton(widget)
-        delete_btn.setText(t("删除"))
-        delete_btn.setFixedHeight(28)
+        delete_btn = QPushButton(t("删除"), widget)
+        delete_btn.setObjectName("smallButton")
         delete_btn.clicked.connect(
             lambda _=False, task_id=task.id: self.deleteRequested.emit(task_id)
         )

@@ -2,17 +2,16 @@
 
 from pathlib import Path
 
-from PyInstaller.utils.hooks import collect_data_files, collect_submodules
-
 ROOT = Path(SPECPATH).resolve().parent
 
-datas = collect_data_files("qfluentwidgets")
-datas += [
+datas = [
     (str(ROOT / "nex" / "resources" / "nex.ico"), "nex/resources"),
     (str(ROOT / "nex" / "resources" / "nex.png"), "nex/resources"),
+    (str(ROOT / "nex" / "resources" / "arrow_down.png"), "nex/resources"),
+    (str(ROOT / "nex" / "resources" / "arrow_up.png"), "nex/resources"),
 ]
 
-hiddenimports = collect_submodules("qfluentwidgets")
+hiddenimports = []
 
 a = Analysis(
     [str(ROOT / "build" / "nex_launcher.py")],

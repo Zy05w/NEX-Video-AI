@@ -1,0 +1,13 @@
+PySide6 6.12.0 / Qt 6
+=====================
+
+PySide6 is used under the GNU Lesser General Public License v3 (LGPLv3),
+not under a Qt commercial license.
+
+The Qt / PySide6 libraries are shipped as separate DLLs inside the
+"_internal/PySide6" directory of the installation. They are dynamically
+linked, and users may replace them with compatible versions of the same
+library. The full LGPLv3 text is provided in "LGPLv3.txt".
+
+PySide6 project: https://www.qt.io/qt-for-python
+Qt project:      https://www.qt.io/

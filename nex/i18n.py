@@ -42,6 +42,11 @@ EN = {
     "清空视图": "Clear View",
     "保存": "Save",
     "取消": "Cancel",
+    "确定": "OK",
+    "退出": "Exit",
+    "是": "Yes",
+    "否": "No",
+    "启用": "Enable",
     "删除": "Delete",
     "重试": "Retry",
     "浏览...": "Browse...",
@@ -121,9 +126,9 @@ EN = {
     "日志保留天数": "Log Retention (days)",
     "温度保护上限 (°C)": "Temperature Limit (°C)",
     "界面语言": "Language",
-    "版本 {version} · 开源组件：Real-ESRGAN（BSD-3）、RIFE（MIT）、FFmpeg（GPL v3）、PySide6（LGPLv3）、qfluentwidgets（GPLv3，商用需授权）\n许可证文本见安装目录 licenses/。温度保护上限设为 0 表示关闭。": (
+    "版本 {version} · 开源组件：Real-ESRGAN（BSD-3）、RIFE（MIT）、FFmpeg（GPL v3）、PySide6（LGPLv3）\n许可证文本见安装目录 licenses/。温度保护上限设为 0 表示关闭。": (
         "Version {version} · Open-source: Real-ESRGAN (BSD-3), RIFE (MIT), "
-        "FFmpeg (GPL v3), PySide6 (LGPLv3), qfluentwidgets (GPLv3, commercial license required)\n"
+        "FFmpeg (GPL v3), PySide6 (LGPLv3)\n"
         "License texts are in the licenses/ folder. "
         "Set the temperature limit to 0 to disable it."
     ),

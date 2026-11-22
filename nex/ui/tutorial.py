@@ -1,11 +1,12 @@
-"""内置使用教程对话框。"""
+"""内置使用教程对话框（原生 Qt）。"""
 
 from __future__ import annotations
 
 from PySide6.QtGui import QColor, QFont, QTextCursor
-from qfluentwidgets import MessageBoxBase, SubtitleLabel, TextEdit
+from PySide6.QtWidgets import QTextEdit
 
 from ..i18n import get_language, t
+from .base_dialog import BaseDialog
 
 TUTORIAL_MARKDOWN = """
 # NEX 视频增强 · 使用教程
@@ -49,7 +50,7 @@ TUTORIAL_MARKDOWN = """
 ## 5. 日志与设置
 
 - 底部日志面板显示当前选中任务的详细进度
-- 设置中可以修改：默认输出目录、编码器、显卡、日志保留天数、温度保护上限
+- 设置中可以修改：默认输出目录、编码器、显卡、日志保留天数、温度保护上限、界面语言
 - 温度保护：处理中每 5 秒检查一次显卡温度，超过上限（默认 88°C）会自动安全停止任务
 - 温度保护上限设为 0 表示关闭
 
@@ -143,13 +144,13 @@ Version 0.1.0 · For more details, see the project docs folder
 """
 
 
-class TutorialDialog(MessageBoxBase):
+class TutorialDialog(BaseDialog):
     def __init__(self, parent=None):
-        super().__init__(parent)
-        self.titleLabel = SubtitleLabel(t("使用教程"), self)
-        self.viewLayout.addWidget(self.titleLabel)
+        super().__init__(t("使用教程"), parent, show_cancel=False)
+        self.setMinimumWidth(820)
+        self.resize(860, 700)
 
-        self.textEdit = TextEdit(self)
+        self.textEdit = QTextEdit(self)
         self.textEdit.setReadOnly(True)
         self.textEdit.setFont(QFont("Microsoft YaHei UI", 10))
         markdown = (
@@ -161,13 +162,11 @@ class TutorialDialog(MessageBoxBase):
         self.textEdit.selectAll()
         self.textEdit.setTextColor(QColor("#1F2329"))
         self.textEdit.moveCursor(QTextCursor.Start)
-        self.textEdit.setMinimumSize(720, 500)
+        self.textEdit.setMinimumSize(760, 520)
         self.textEdit.setStyleSheet(
             "QTextEdit { background: #FFFFFF; color: #1F2329;"
-            " border: 1px solid #E5EAF2; border-radius: 8px; padding: 8px; }"
+            " border: 1px solid #E5EAF2; border-radius: 6px; padding: 8px; }"
         )
-        self.viewLayout.addWidget(self.textEdit)
+        self.contentLayout.addWidget(self.textEdit)
 
-        self.yesButton.setText(t("知道了"))
-        self.hideCancelButton()
-        self.widget.setMinimumSize(780, 620)
+        self.okButton.setText(t("知道了"))

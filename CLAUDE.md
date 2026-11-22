@@ -1,9 +1,9 @@
 # NEX 视频增强 — 项目工作指引
 
 Windows 11 桌面端 **AI 视频超分 + 补帧**软件（商用产品，类似 SVFI / Topaz Video AI）。
-技术栈：Python 3.11 + PySide6 + qfluentwidgets；引擎为 FFmpeg + realesrgan-ncnn-vulkan + rife-ncnn-vulkan（Vulkan / NVIDIA GPU）。
+技术栈：Python 3.11 + PySide6（原生控件 + 自定义 QSS）；引擎为 FFmpeg + realesrgan-ncnn-vulkan + rife-ncnn-vulkan（Vulkan / NVIDIA GPU）。
 
-当前阶段：**S6 打包与安装包（暂停：qfluentwidgets 商用许可待决策）**
+当前阶段：**S6 打包与安装包（已完成，待用户确认）**
 
 ## 标准文件索引
 

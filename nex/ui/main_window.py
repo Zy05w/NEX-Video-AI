@@ -1,20 +1,18 @@
-"""主窗口：任务队列、处理控制与日志。"""
+"""主窗口：任务队列、处理控制与日志（原生 Qt）。"""
 
 from __future__ import annotations
 
 from pathlib import Path
 
 from PySide6.QtGui import QFont
-from PySide6.QtWidgets import QHBoxLayout, QMainWindow, QVBoxLayout, QWidget
-from qfluentwidgets import (
-    CaptionLabel,
-    FluentIcon as FIF,
-    MessageBox,
-    PrimaryPushButton,
-    PushButton,
-    StrongBodyLabel,
-    SubtitleLabel,
-    TextEdit,
+from PySide6.QtWidgets import (
+    QHBoxLayout,
+    QLabel,
+    QMainWindow,
+    QPushButton,
+    QTextEdit,
+    QVBoxLayout,
+    QWidget,
 )
 
 from .. import APP_NAME
@@ -26,6 +24,7 @@ from ..pipeline import cleanup_stale_temp
 from ..task import Task, TaskParams, TaskStatus, new_task
 from ..worker import PipelineWorker
 from .add_task_dialog import AddTaskDialog
+from .message import ask, notify
 from .settings_dialog import SettingsDialog
 from .task_table import TaskTableWidget
 
@@ -79,27 +78,23 @@ class MainWindow(QMainWindow):
 
         title_box = QVBoxLayout()
         title_box.setSpacing(0)
-        title = SubtitleLabel(t(APP_NAME), toolbar)
-        subtitle = CaptionLabel(t("AI 视频超分 · 补帧"), toolbar)
-        subtitle.setStyleSheet("color: #6B7280;")
+        title = QLabel(t(APP_NAME), toolbar)
+        title.setObjectName("titleLabel")
+        subtitle = QLabel(t("AI 视频超分 · 补帧"), toolbar)
+        subtitle.setObjectName("subtitleLabel")
         title_box.addWidget(title)
         title_box.addWidget(subtitle)
         bar.addLayout(title_box)
         bar.addStretch(1)
 
-        self.addBtn = PrimaryPushButton(toolbar)
-        self.addBtn.setText(t("添加任务"))
-        self.addBtn.setIcon(FIF.ADD)
+        self.addBtn = QPushButton(t("添加任务"), toolbar)
+        self.addBtn.setObjectName("primaryButton")
         self.addBtn.clicked.connect(self._on_add_task)
 
-        self.startBtn = PushButton(toolbar)
-        self.startBtn.setText(t("开始全部"))
-        self.startBtn.setIcon(FIF.PLAY)
+        self.startBtn = QPushButton(t("开始全部"), toolbar)
         self.startBtn.clicked.connect(self._on_start_all)
 
-        self.settingsBtn = PushButton(toolbar)
-        self.settingsBtn.setText(t("设置"))
-        self.settingsBtn.setIcon(FIF.SETTING)
+        self.settingsBtn = QPushButton(t("设置"), toolbar)
         self.settingsBtn.clicked.connect(self._on_settings)
 
         bar.addWidget(self.addBtn)
@@ -121,17 +116,17 @@ class MainWindow(QMainWindow):
         log_layout.setSpacing(6)
 
         log_header = QHBoxLayout()
-        self.logTitle = StrongBodyLabel(t("日志 · 未选择任务"), log_panel)
-        clear_btn = PushButton(log_panel)
-        clear_btn.setText(t("清空视图"))
-        clear_btn.setFixedHeight(28)
+        self.logTitle = QLabel(t("日志 · 未选择任务"), log_panel)
+        self.logTitle.setObjectName("logTitle")
+        clear_btn = QPushButton(t("清空视图"), log_panel)
+        clear_btn.setObjectName("smallButton")
         clear_btn.clicked.connect(self._clear_log_view)
         log_header.addWidget(self.logTitle)
         log_header.addStretch(1)
         log_header.addWidget(clear_btn)
         log_layout.addLayout(log_header)
 
-        self.logEdit = TextEdit(log_panel)
+        self.logEdit = QTextEdit(log_panel)
         self.logEdit.setReadOnly(True)
         self.logEdit.setMinimumHeight(140)
         self.logEdit.setMaximumHeight(180)
@@ -155,7 +150,7 @@ class MainWindow(QMainWindow):
     # ---------- 任务操作 ----------
     def _on_add_task(self) -> None:
         dialog = AddTaskDialog(self)
-        if not dialog.exec() or dialog.request is None:
+        if dialog.exec() != dialog.Accepted or dialog.request is None:
             return
         request = dialog.request
         added: list[Task] = []
@@ -219,7 +214,8 @@ class MainWindow(QMainWindow):
     def _on_retry_requested(self, task_id: str) -> None:
         task = self.repo.get(task_id)
         if task is None or task.status not in (
-            TaskStatus.FAILED, TaskStatus.CANCELLED
+            TaskStatus.FAILED,
+            TaskStatus.CANCELLED,
         ):
             return
         task.status = TaskStatus.PENDING
@@ -241,21 +237,21 @@ class MainWindow(QMainWindow):
         if task is None:
             return
         if task.status == TaskStatus.RUNNING:
-            MessageBox(
+            notify(
+                self,
                 t("无法删除"),
                 t("任务正在处理中，请先取消后再删除。"),
-                self,
-            ).exec()
+            )
             return
-        box = MessageBox(
+        if ask(
+            self,
             t("删除任务记录"),
             t(
                 "确定删除「{name}」的记录吗？\n仅删除记录，不会删除视频文件。",
                 name=task.file_name,
             ),
-            self,
-        )
-        if box.exec():
+            ok_text=t("删除"),
+        ):
             self.repo.delete(task_id)
             self.table.remove_task(task_id)
             if self._selected_task_id == task_id:
@@ -270,18 +266,18 @@ class MainWindow(QMainWindow):
         if self.config.language == old_language:
             return
         if self.worker.is_busy:
-            MessageBox(
+            notify(
+                self,
                 t("语言已更改"),
                 t("有任务正在处理，请在任务结束后手动重启软件使语言生效。"),
-                self,
-            ).exec()
+            )
             return
-        box = MessageBox(
+        if ask(
+            self,
             t("语言已更改"),
             t("语言设置将在重启软件后生效。是否立即重启？"),
-            self,
-        )
-        if box.exec():
+            ok_text=t("确定"),
+        ):
             self.worker.stop()
             self.worker.wait(5000)
             from ..app import restart_app
@@ -373,12 +369,12 @@ class MainWindow(QMainWindow):
     # ---------- 关闭 ----------
     def closeEvent(self, event) -> None:
         if self.worker.is_busy:
-            box = MessageBox(
+            if not ask(
+                self,
                 t("退出软件"),
                 t("有任务正在处理，退出将停止当前任务。确定退出吗？"),
-                self,
-            )
-            if not box.exec():
+                ok_text=t("退出"),
+            ):
                 event.ignore()
                 return
         self.worker.stop()
