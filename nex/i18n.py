@@ -121,9 +121,9 @@ EN = {
     "日志保留天数": "Log Retention (days)",
     "温度保护上限 (°C)": "Temperature Limit (°C)",
     "界面语言": "Language",
-    "版本 {version} · 开源组件：Real-ESRGAN（BSD-3）、RIFE（MIT）、FFmpeg（GPL v3）、PySide6（LGPLv3）、qfluentwidgets（MIT）\n许可证文本见安装目录 licenses/。温度保护上限设为 0 表示关闭。": (
+    "版本 {version} · 开源组件：Real-ESRGAN（BSD-3）、RIFE（MIT）、FFmpeg（GPL v3）、PySide6（LGPLv3）、qfluentwidgets（GPLv3，商用需授权）\n许可证文本见安装目录 licenses/。温度保护上限设为 0 表示关闭。": (
         "Version {version} · Open-source: Real-ESRGAN (BSD-3), RIFE (MIT), "
-        "FFmpeg (GPL v3), PySide6 (LGPLv3), qfluentwidgets (MIT)\n"
+        "FFmpeg (GPL v3), PySide6 (LGPLv3), qfluentwidgets (GPLv3, commercial license required)\n"
         "License texts are in the licenses/ folder. "
         "Set the temperature limit to 0 to disable it."
     ),

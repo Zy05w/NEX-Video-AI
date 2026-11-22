@@ -16,6 +16,9 @@ wheels/
 Real-ESRGAN-main/
 Practical-RIFE/
 
+# 原始图标（已复制到 nex/resources/）
+/Nex.png
+
 # 构建产物
 dist/
 build/work/

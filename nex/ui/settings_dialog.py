@@ -104,7 +104,8 @@ class SettingsDialog(MessageBoxBase):
         about = CaptionLabel(
             t(
                 "版本 {version} · 开源组件：Real-ESRGAN（BSD-3）、RIFE（MIT）、"
-                "FFmpeg（GPL v3）、PySide6（LGPLv3）、qfluentwidgets（MIT）\n"
+                "FFmpeg（GPL v3）、PySide6（LGPLv3）、"
+                "qfluentwidgets（GPLv3，商用需授权）\n"
                 "许可证文本见安装目录 licenses/。温度保护上限设为 0 表示关闭。",
                 version=APP_VERSION,
             ),
