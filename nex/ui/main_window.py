@@ -107,6 +107,7 @@ class MainWindow(QMainWindow):
         self.table.cancelRequested.connect(self._on_cancel_requested)
         self.table.retryRequested.connect(self._on_retry_requested)
         self.table.deleteRequested.connect(self._on_delete_requested)
+        self.table.detailsRequested.connect(self._on_details_requested)
         root.addWidget(self.table, 1)
 
         log_panel = QWidget(central)
@@ -260,6 +261,25 @@ class MainWindow(QMainWindow):
                 self.logEdit.clear()
             self.statusBar().showMessage(t("已删除任务记录"), 3000)
 
+    def _on_details_requested(self, task_id: str) -> None:
+        task = self.repo.get(task_id)
+        if task is None:
+            return
+        log_path = task.log_path or str(
+            config_dir() / "logs" / f"{task.id}.log"
+        )
+        notify(
+            self,
+            t("失败原因"),
+            t(
+                "「{name}」处理失败。\n\n{message}\n\n日志：{log}",
+                name=task.file_name,
+                message=(task.error or t("未知错误"))[:1200],
+                log=log_path,
+            ),
+            ok_text=t("知道了"),
+        )
+
     def _on_settings(self) -> None:
         old_language = self.config.language
         SettingsDialog(self.config, self).exec()
@@ -355,7 +375,7 @@ class MainWindow(QMainWindow):
         except OSError:
             lines = []
         if not lines and task.error:
-            lines = [f"[错误] {task.error}"]
+            lines = [f"[{t('错误')}] {task.error}"]
         if not lines:
             lines = [
                 t("（暂无日志）目标参数：{summary}", summary=task.summary)

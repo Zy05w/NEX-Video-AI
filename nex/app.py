@@ -12,16 +12,9 @@ from PySide6.QtWidgets import QApplication
 from . import APP_NAME, APP_VERSION
 from .app_config import AppConfig
 from .i18n import set_language, t
+from .paths import resource_path
 from .ui.main_window import MainWindow
 from .ui.theme import apply_theme
-
-
-def resource_path(name: str) -> Path:
-    if getattr(sys, "frozen", False):
-        base = Path(getattr(sys, "_MEIPASS", Path(sys.executable).parent))
-    else:
-        base = Path(__file__).resolve().parent.parent
-    return base / "nex" / "resources" / name
 
 
 def _self_test() -> int:

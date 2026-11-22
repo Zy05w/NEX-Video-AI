@@ -132,6 +132,28 @@ EN = {
         "License texts are in the licenses/ folder. "
         "Set the temperature limit to 0 to disable it."
     ),
+    "版本 {version} · 开源组件许可证可在「关于」中查看。": (
+        "Version {version} · Open-source licenses are available under About."
+    ),
+    "关于": "About",
+    "关于 NEX": "About NEX",
+    "版本 {version}": "Version {version}",
+    "AI 视频超分与补帧工具": "AI video upscaling and frame interpolation",
+    "本软件使用以下开源组件：": "This software uses the following open-source components:",
+    "许可证全文位于安装目录 licenses/ 文件夹。": (
+        "Full license texts are in the licenses/ folder."
+    ),
+    "打开许可证文件夹": "Open Licenses Folder",
+    "关闭": "Close",
+    "Practical-RIFE 4.25（可选）": "Practical-RIFE 4.25 (optional)",
+    "GPL + 启动器例外": "GPL + launcher exception",
+    "© 2026 NEX. 保留所有权利。": "© 2026 NEX. All rights reserved.",
+    "详情": "Details",
+    "失败原因": "Failure Details",
+    "「{name}」处理失败。\n\n{message}\n\n日志：{log}": (
+        "“{name}” failed.\n\n{message}\n\nLog: {log}"
+    ),
+    "查看日志文件": "View Log File",
     "语言已更改": "Language Changed",
     "语言设置将在重启软件后生效。是否立即重启？": "The language change takes effect after restarting. Restart now?",
     "有任务正在处理，请在任务结束后手动重启软件使语言生效。": "A task is running. Please restart the app manually after it finishes to apply the language.",
@@ -149,6 +171,7 @@ EN = {
     "完成": "Done",
     "错误": "Error",
     "无": "none",
+    "未知": "unknown",
     "引擎": "Engine",
     # 日志与错误
     "{name} · {width}x{height} · {fps}fps · {duration}s · 音轨 {audio}": (
@@ -225,4 +248,63 @@ EN = {
     "引擎执行失败（退出码 {code}）": "Engine failed (exit code {code})",
     "{stage}失败：{message}": "{stage} failed: {message}",
     "{stage}失败（退出码 {code}）：{message}": "{stage} failed (exit code {code}): {message}",
+    "视频文件为空（0 字节）：{path}": "Video file is empty (0 bytes): {path}",
+    "不是有效的视频文件：{path}": "Not a valid video file: {path}",
+    "磁盘预检：临时空间预计 {temp}，可用 {temp_free}；输出预计 {output}，可用 {output_free}": (
+        "Disk check: temp {temp} estimated ({temp_free} free); "
+        "output {output} estimated ({output_free} free)"
+    ),
+    "视频时长未知，磁盘预检仅作粗略估算": (
+        "Video duration is unknown; the disk check is only a rough estimate"
+    ),
+    "磁盘空间不足，无法开始处理：\n{issues}\n\n请清理磁盘空间后重试；也可以把输出位置改到空间更大的磁盘。": (
+        "Not enough disk space to start:\n{issues}\n\n"
+        "Free up disk space and retry, or choose an output folder on a larger disk."
+    ),
+    "输出位置不可写：{error}": "Output folder is not writable: {error}",
+    "无法创建临时工作目录：{error}": "Cannot create temporary work folder: {error}",
+    "输出文件写入失败。请检查输出位置是否可写、磁盘空间是否充足。": (
+        "Failed to write the output file. Check that the output folder is writable "
+        "and has enough free space."
+    ),
+    "引擎原始输出：{path}": "Raw engine output: {path}",
+    "磁盘空间不足：{path}。请清理磁盘空间后重试。": (
+        "Not enough disk space: {path}. Free up space and retry."
+    ),
+    "找不到文件或文件夹：{path}。": "File or folder not found: {path}.",
+    "没有权限访问：{path}。请换一个输出位置，或以管理员身份运行软件。": (
+        "No permission to access {path}. Choose another output folder or run the app as administrator."
+    ),
+    "路径过长，Windows 无法处理：{path}。请把视频或输出位置移到路径更短的文件夹。": (
+        "The path is too long for Windows: {path}. "
+        "Move the video or output folder to a shorter path."
+    ),
+    "文件正被其他程序占用：{path}。请关闭占用该文件的程序后重试。": (
+        "The file is in use by another program: {path}. Close it and retry."
+    ),
+    "文件或文件夹操作失败：{message}": "File operation failed: {message}",
+    "未知错误": "Unknown error",
+    "磁盘空间不足，处理无法继续。请清理磁盘空间后重试。": (
+        "Not enough disk space to continue. Free up space and retry."
+    ),
+    "没有权限写入文件或文件夹。请换一个输出位置后重试。": (
+        "No permission to write files or folders. Choose another output folder and retry."
+    ),
+    "文件路径过长，系统无法处理。请把视频和输出位置移到路径更短的文件夹。": (
+        "The file path is too long for Windows. Move the video and output folder to a shorter path."
+    ),
+    "无法读取视频文件，文件可能已损坏或格式不受支持。": (
+        "Cannot read the video. The file may be damaged or the format is unsupported."
+    ),
+    "找不到视频文件或相关文件。": "The video file or a related file was not found.",
+    "临时目录和输出位置所在的磁盘空间不足：需要约 {need}，当前可用 {free}。\n位置：{path}": (
+        "Not enough space on the disk used for temp files and output: "
+        "about {need} needed, {free} available.\nLocation: {path}"
+    ),
+    "临时空间不足：需要约 {need}，当前可用 {free}。\n位置：{path}": (
+        "Not enough temporary space: about {need} needed, {free} available.\nLocation: {path}"
+    ),
+    "输出位置空间不足：需要约 {need}，当前可用 {free}。\n位置：{path}": (
+        "Not enough space at the output location: about {need} needed, {free} available.\nLocation: {path}"
+    ),
 }

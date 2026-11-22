@@ -18,6 +18,7 @@ from fractions import Fraction
 from pathlib import Path
 from typing import Callable, Iterable, Optional
 
+from . import errors, paths
 from .i18n import t
 from .logger import TaskLogger
 
@@ -150,14 +151,14 @@ def check_practical_rife() -> list[str]:
         repo / "train_log" / "IFNet_HDv3.py",
         repo / "model" / "warplayer.py",
     ]
-    return [str(path) for path in required if not path.exists()]
+    return [str(path) for path in required if not paths.exists(path)]
 
 
 def check_engines() -> list[str]:
     """返回缺失的引擎文件列表；为空表示就绪。"""
     missing = []
     for path in (ffmpeg_exe(), ffprobe_exe(), realesrgan_exe(), rife_exe()):
-        if not path.exists():
+        if not paths.exists(path):
             missing.append(str(path))
     return missing
 
@@ -174,15 +175,21 @@ def _parse_rate(value: str | None) -> float:
 
 def probe(path: str | Path) -> MediaInfo:
     path = Path(path)
-    if not path.exists():
+    if not paths.exists(path):
         raise EngineError("探测", t("文件不存在：{path}", path=path))
+    if not paths.is_file(path):
+        raise EngineError("探测", t("不是有效的视频文件：{path}", path=path))
+    if paths.file_size(path) <= 0:
+        raise EngineError(
+            "探测", t("视频文件为空（0 字节）：{path}", path=path)
+        )
     cmd = [
-        str(ffprobe_exe()),
+        paths.external_path(ffprobe_exe()),
         "-v", "error",
         "-print_format", "json",
         "-show_format",
         "-show_streams",
-        str(path),
+        paths.external_path(path),
     ]
     proc = subprocess.run(
         cmd,
@@ -193,9 +200,11 @@ def probe(path: str | Path) -> MediaInfo:
         creationflags=CREATE_NO_WINDOW,
     )
     if proc.returncode != 0:
+        tail = (proc.stderr or "")[-1200:]
+        message = errors.diagnose_engine_log(tail) or t("无法读取视频信息")
         raise EngineError(
-            "探测", t("无法读取视频信息"), command=cmd,
-            returncode=proc.returncode, log_tail=(proc.stderr or "")[-1200:],
+            "探测", message, command=cmd,
+            returncode=proc.returncode, log_tail=tail,
         )
     try:
         data = json.loads(proc.stdout)
@@ -290,14 +299,19 @@ def run_process(
         try:
             proc = subprocess.Popen(
                 cmd,
-                cwd=str(cwd),
+                cwd=paths.external_path(cwd),
                 stdout=log_file,
                 stderr=log_file,
                 creationflags=CREATE_NO_WINDOW,
             )
         except OSError as exc:
             raise EngineError(
-                stage, t("无法启动引擎：{error}", error=exc), command=cmd
+                stage,
+                t(
+                    "无法启动引擎：{error}",
+                    error=errors.friendly_os_error(exc, cmd[0] if cmd else ""),
+                ),
+                command=cmd,
             )
         try:
             while proc.poll() is None:
@@ -318,24 +332,28 @@ def run_process(
             _kill_tree(proc.pid)
             raise CancelledError(t("任务已取消"))
     if proc.returncode != 0:
+        tail = _tail(engine_log)
+        message = errors.diagnose_engine_log(tail) or t(
+            "引擎执行失败（退出码 {code}）", code=proc.returncode
+        )
         raise EngineError(
             stage,
-            t("引擎执行失败（退出码 {code}）", code=proc.returncode),
+            message,
             command=cmd,
             returncode=proc.returncode,
-            log_tail=_tail(engine_log),
+            log_tail=tail,
         )
 
 
 def count_video_frames(path: str | Path) -> int:
     """读取视频容器记录的帧数（不进行全量解码）。"""
     cmd = [
-        str(ffprobe_exe()),
+        paths.external_path(ffprobe_exe()),
         "-v", "error",
         "-select_streams", "v:0",
         "-show_entries", "stream=nb_frames",
         "-of", "csv=p=0",
-        str(path),
+        paths.external_path(path),
     ]
     proc = subprocess.run(
         cmd, capture_output=True, text=True, encoding="utf-8",
@@ -369,17 +387,17 @@ def extract_frames(
     cancel,
     on_progress: Optional[Callable[[float], None]] = None,
 ) -> int:
-    frames_dir.mkdir(parents=True, exist_ok=True)
+    paths.makedirs(frames_dir)
     progress_file = frames_dir.parent / "ffmpeg_extract_progress.txt"
     try:
         progress_file.unlink()
     except OSError:
         pass
     cmd = [
-        str(ffmpeg_exe()),
+        paths.external_path(ffmpeg_exe()),
         "-y", "-hide_banner", "-loglevel", "error",
         "-progress", str(progress_file), "-nostats",
-        "-i", str(input_path),
+        "-i", paths.external_path(input_path),
         "-fps_mode", "passthrough",
         str(frames_dir / "%08d.png"),
     ]
@@ -403,11 +421,11 @@ def run_sr(
     total_frames: int,
     on_progress: Optional[Callable[[float], None]] = None,
 ) -> int:
-    output_dir.mkdir(parents=True, exist_ok=True)
+    paths.makedirs(output_dir)
     cmd = [
-        str(realesrgan_exe()),
-        "-i", str(input_dir),
-        "-o", str(output_dir),
+        paths.external_path(realesrgan_exe()),
+        "-i", paths.external_path(input_dir),
+        "-o", paths.external_path(output_dir),
         "-n", model,
         "-s", str(scale),
         "-f", "png",
@@ -432,11 +450,11 @@ def run_fi(
     total_frames: int,
     on_progress: Optional[Callable[[float], None]] = None,
 ) -> int:
-    output_dir.mkdir(parents=True, exist_ok=True)
+    paths.makedirs(output_dir)
     cmd = [
-        str(rife_exe()),
-        "-i", str(input_dir),
-        "-o", str(output_dir),
+        paths.external_path(rife_exe()),
+        "-i", paths.external_path(input_dir),
+        "-o", paths.external_path(output_dir),
         "-m", model,
         "-g", str(gpu_id),
     ]
@@ -472,7 +490,7 @@ def run_fi_pytorch(
                 files="\n".join(missing),
             ),
         )
-    output_dir.mkdir(parents=True, exist_ok=True)
+    paths.makedirs(output_dir)
     try:
         progress_file.unlink()
     except OSError:
@@ -534,10 +552,14 @@ def encode_video(
     on_progress: Optional[Callable[[float], None]] = None,
 ) -> None:
     try:
-        output_path.parent.mkdir(parents=True, exist_ok=True)
+        paths.makedirs(output_path.parent)
     except OSError as exc:
         raise EngineError(
-            "合成", t("无法创建输出目录：{error}", error=exc)
+            "合成",
+            t(
+                "无法创建输出目录：{error}",
+                error=errors.friendly_os_error(exc, output_path.parent),
+            ),
         )
     try:
         progress_file.unlink()
@@ -549,12 +571,12 @@ def encode_video(
         f"scale={target_width}:{target_height}:flags=lanczos"
     )
     cmd = [
-        str(ffmpeg_exe()),
+        paths.external_path(ffmpeg_exe()),
         "-y", "-hide_banner", "-loglevel", "error",
         "-progress", str(progress_file), "-nostats",
         "-framerate", f"{frame_fps:g}",
         "-i", str(frames_dir / "%08d.png"),
-        "-i", str(audio_source),
+        "-i", paths.external_path(audio_source),
         "-map", "0:v:0", "-map", "1:a?",
     ]
     if has_audio:
@@ -576,7 +598,10 @@ def encode_video(
             "-c:v", "libx264", "-crf", str(crf), "-preset", preset,
             "-pix_fmt", "yuv420p",
         ]
-    cmd += ["-movflags", "+faststart", "-shortest", str(output_path)]
+    cmd += [
+        "-movflags", "+faststart", "-shortest",
+        paths.external_path(output_path),
+    ]
 
     def poll() -> None:
         if on_progress and duration > 0:

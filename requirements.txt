@@ -1,9 +1,8 @@
-# NEX 视频增强 — Python 依赖
+# NEX 视频增强 — Python 依赖（v0.1.0 发布锁定版本）
 # 安装：pip install -r requirements.txt
-# 版本策略：S2 开始实际使用后锁定精确版本（docs/04-代码工程规范.md）
 
-PySide6>=6.7,<7
+PySide6==6.12.0
 
-# 开发与打包
-pytest>=8,<9
-pyinstaller>=6.6,<7
+# 开发与打包（不随安装包分发）
+pytest==8.4.2
+pyinstaller==6.22.3

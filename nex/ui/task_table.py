@@ -35,6 +35,7 @@ class TaskTableWidget(QTableWidget):
     cancelRequested = Signal(str)
     retryRequested = Signal(str)
     deleteRequested = Signal(str)
+    detailsRequested = Signal(str)
 
     HEADERS = ["文件名", "状态", "进度", "目标参数", "操作"]
 
@@ -54,7 +55,7 @@ class TaskTableWidget(QTableWidget):
         self.setTextElideMode(Qt.ElideRight)
         self.setColumnWidth(1, 120)
         self.setColumnWidth(2, 200)
-        self.setColumnWidth(4, 170)
+        self.setColumnWidth(4, 230)
         header = self.horizontalHeader()
         header.setHighlightSections(False)
         header.setStretchLastSection(False)
@@ -79,6 +80,8 @@ class TaskTableWidget(QTableWidget):
         status_item = QTableWidgetItem(t(task.status.value))
         status_item.setTextAlignment(Qt.AlignCenter)
         status_item.setForeground(QColor(STATUS_COLORS.get(task.status, "#1F2329")))
+        if task.error:
+            status_item.setToolTip(task.error)
         self.setItem(row, 1, status_item)
 
         self.setCellWidget(row, 2, self._build_progress(task))
@@ -167,6 +170,15 @@ class TaskTableWidget(QTableWidget):
             )
             layout.addWidget(cancel_btn)
         elif task.status in (TaskStatus.FAILED, TaskStatus.CANCELLED):
+            if task.status == TaskStatus.FAILED:
+                details_btn = QPushButton(t("详情"), widget)
+                details_btn.setObjectName("smallButton")
+                details_btn.clicked.connect(
+                    lambda _=False, task_id=task.id: self.detailsRequested.emit(
+                        task_id
+                    )
+                )
+                layout.addWidget(details_btn)
             retry_btn = QPushButton(t("重试"), widget)
             retry_btn.setObjectName("smallButton")
             retry_btn.clicked.connect(
@@ -193,6 +205,7 @@ class TaskTableWidget(QTableWidget):
             status_item.setForeground(
                 QColor(STATUS_COLORS.get(task.status, "#1F2329"))
             )
+            status_item.setToolTip(task.error or "")
         summary_item = self.item(index, 3)
         if summary_item:
             summary_item.setText(task.summary or "—")

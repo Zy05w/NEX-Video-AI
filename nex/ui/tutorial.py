@@ -64,6 +64,7 @@ TUTORIAL_MARKDOWN = """
 - **会损伤显卡吗？** AI 计算属于正常负载，不超频、不改电压；软件还有温度保护
 - **没有声音？** 软件会尽量复制原音频；请确认原视频本身有音轨
 - **视频编码很慢？** 当前默认使用 x264 软件编码；NVENC 需显卡驱动 610+
+- **提示磁盘空间不足？** 处理过程需要临时空间，通常为原视频的数倍；请清理系统盘或输出盘后重试
 
 ## 7. 使用建议
 
@@ -131,6 +132,7 @@ TUTORIAL_MARKDOWN_EN = """
 - **GPU safety?** Normal compute load, no overclocking; a temperature guard is included
 - **No audio?** The app copies source audio when possible; check the source file
 - **Encoding slow?** x264 software encoding is used by default; NVENC requires driver 610+
+- **Out of disk space?** Processing needs temporary space, often several times the source size. Free up the system or output drive and retry
 - **Language?** Change it in Settings, then restart the app to apply
 
 ## 7. Tips

@@ -12,8 +12,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Optional
 
-from . import engines, gpu
+from . import engines, gpu, paths, storage
 from .engines import CancelledError, EngineError, MediaInfo
+from .errors import friendly_os_error
 from .i18n import t
 from .logger import TaskLogger
 
@@ -177,13 +178,18 @@ def _choose_output(options: PipelineOptions, info: MediaInfo) -> Path:
         return Path(options.output_path)
     base = Path(options.output_dir) if options.output_dir else info.path.parent
     try:
-        base.mkdir(parents=True, exist_ok=True)
+        paths.makedirs(base)
     except OSError as exc:
-        raise PipelineError(t("无法创建输出目录：{error}", error=exc))
+        raise PipelineError(
+            t(
+                "无法创建输出目录：{error}",
+                error=friendly_os_error(exc, base),
+            )
+        )
     stem = info.path.stem
     candidate = base / f"{stem}_NEX.mp4"
     index = 1
-    while candidate.exists():
+    while paths.exists(candidate):
         candidate = base / f"{stem}_NEX_{index}.mp4"
         index += 1
     return candidate
@@ -251,26 +257,10 @@ def run_pipeline(
             ),
         )
 
-        if options.temp_guard:
-            status = gpu.query_gpu()
-            if status is not None:
-                logger.log(
-                    "温度",
-                    t(
-                        "显卡 {name} · 初始 {temp}°C · 保护上限 {limit}°C",
-                        name=status.name,
-                        temp=status.temperature,
-                        limit=f"{options.temp_limit:g}",
-                    ),
-                )
-                monitor = gpu.GpuMonitor(
-                    logger, cancel, limit=options.temp_limit
-                )
-                monitor.start()
-            else:
-                logger.log(
-                    "温度", t("未检测到 nvidia-smi，跳过温度监控")
-                )
+        if info.duration <= 0:
+            logger.log(
+                "磁盘", t("视频时长未知，磁盘预检仅作粗略估算")
+            )
 
         if not options.sr.enabled and not options.fi.enabled:
             raise PipelineError(t("请至少开启超分或补帧中的一项"))
@@ -330,6 +320,83 @@ def run_pipeline(
         else:
             logger.log("规划", t("补帧：未启用"))
 
+        if sr_plan is not None:
+            final_w = sr_plan["final_w"]
+            final_h = sr_plan["final_h"]
+        else:
+            final_w, final_h = _even(info.width), _even(info.height)
+
+        output_path = _choose_output(options, info)
+        try:
+            storage.ensure_writable(output_path.parent)
+        except OSError as exc:
+            raise PipelineError(
+                t(
+                    "输出位置不可写：{error}",
+                    error=friendly_os_error(exc, output_path.parent),
+                )
+            )
+
+        temp_required = storage.estimate_temp_bytes(
+            info, sr_plan, fi_passes, keep_temp=options.keep_temp
+        )
+        output_required = storage.estimate_output_bytes(
+            info, final_w, final_h, final_fps
+        )
+        temp_free = storage.free_bytes(temp_root)
+        output_free = storage.free_bytes(output_path.parent)
+        logger.log(
+            "磁盘",
+            t(
+                "磁盘预检：临时空间预计 {temp}，可用 {temp_free}；"
+                "输出预计 {output}，可用 {output_free}",
+                temp=storage.format_size(temp_required),
+                temp_free=(
+                    storage.format_size(temp_free)
+                    if temp_free is not None
+                    else t("未知")
+                ),
+                output=storage.format_size(output_required),
+                output_free=(
+                    storage.format_size(output_free)
+                    if output_free is not None
+                    else t("未知")
+                ),
+            ),
+        )
+        issues = storage.check_disk_space(
+            temp_root, temp_required, output_path.parent, output_required
+        )
+        if issues:
+            raise PipelineError(
+                t(
+                    "磁盘空间不足，无法开始处理：\n{issues}\n\n"
+                    "请清理磁盘空间后重试；也可以把输出位置改到空间更大的磁盘。",
+                    issues="\n\n".join(issue.message() for issue in issues),
+                )
+            )
+
+        if options.temp_guard:
+            status = gpu.query_gpu()
+            if status is not None:
+                logger.log(
+                    "温度",
+                    t(
+                        "显卡 {name} · 初始 {temp}°C · 保护上限 {limit}°C",
+                        name=status.name,
+                        temp=status.temperature,
+                        limit=f"{options.temp_limit:g}",
+                    ),
+                )
+                monitor = gpu.GpuMonitor(
+                    logger, cancel, limit=options.temp_limit
+                )
+                monitor.start()
+            else:
+                logger.log(
+                    "温度", t("未检测到 nvidia-smi，跳过温度监控")
+                )
+
         weights: dict[str, float] = {"抽帧": 5.0}
         if have_sr:
             weights["超分"] = 40.0
@@ -350,7 +417,15 @@ def run_pipeline(
             overall = offsets[stage] + weights[stage] * fraction
             on_progress(stage, overall, message)
 
-        temp_root.mkdir(parents=True, exist_ok=True)
+        try:
+            paths.makedirs(temp_root)
+        except OSError as exc:
+            raise PipelineError(
+                t(
+                    "无法创建临时工作目录：{error}",
+                    error=friendly_os_error(exc, temp_root),
+                )
+            )
 
         # 1. 抽帧
         _check_cancel(cancel)
@@ -413,6 +488,8 @@ def run_pipeline(
             emit("超分", 1.0, f"{new_count} 帧")
             current_frames = sr_out
             frame_count_after = new_count
+            if not options.keep_temp:
+                shutil.rmtree(frames_dir, ignore_errors=True)
 
         # 3. 补帧
         if have_fi:
@@ -430,6 +507,7 @@ def run_pipeline(
                 )
                 stage_started = time.time()
                 total_in = frame_count_after
+                input_frames = current_frames
 
                 def fi_cb(
                     fraction: float,
@@ -475,16 +553,12 @@ def run_pipeline(
                 )
                 current_frames = fi_out
                 frame_count_after = new_count
+                if not options.keep_temp:
+                    shutil.rmtree(input_frames, ignore_errors=True)
             emit("补帧", 1.0, f"{frame_count_after} 帧")
 
         # 4. 合成
         _check_cancel(cancel)
-        if sr_plan is not None:
-            final_w = sr_plan["final_w"]
-            final_h = sr_plan["final_h"]
-        else:
-            final_w, final_h = _even(info.width), _even(info.height)
-        output_path = _choose_output(options, info)
         encoder = options.encode.encoder
         if encoder == "auto":
             encoder = "x264"
@@ -538,8 +612,13 @@ def run_pipeline(
                 engines.encode_video(encoder=encoder, **encode_args)
             else:
                 raise
-        if not output_path.exists() or output_path.stat().st_size == 0:
-            raise PipelineError(t("合成失败：输出文件不存在或为空"))
+        if not paths.exists(output_path) or paths.file_size(output_path) == 0:
+            raise PipelineError(
+                t(
+                    "输出文件写入失败。"
+                    "请检查输出位置是否可写、磁盘空间是否充足。"
+                )
+            )
         logger.log(
             "合成",
             t(
@@ -590,7 +669,22 @@ def run_pipeline(
     except (EngineError, PipelineError) as exc:
         setattr(exc, "log_path", str(logger.path))
         logger.log("错误", str(exc))
+        if isinstance(exc, EngineError):
+            engine_log = logger.path.with_name(
+                f"{logger.path.stem}.engine.log"
+            )
+            if paths.exists(engine_log):
+                logger.log(
+                    "错误",
+                    t("引擎原始输出：{path}", path=engine_log),
+                )
         raise
+    except OSError as exc:
+        target = getattr(exc, "filename", None) or options.input_path
+        error = PipelineError(friendly_os_error(exc, target))
+        setattr(error, "log_path", str(logger.path))
+        logger.log("错误", str(error))
+        raise error
     finally:
         if monitor is not None:
             monitor.stop()

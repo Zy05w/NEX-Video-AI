@@ -52,3 +52,24 @@ def test_tutorial_english_content():
     assert "Quick Start" in TUTORIAL_MARKDOWN_EN
     assert "AI Upscaling" in TUTORIAL_MARKDOWN_EN
     assert "rife-v4.6" in TUTORIAL_MARKDOWN_EN
+
+
+def test_new_s7_ui_strings_are_translated():
+    i18n.set_language("en")
+    try:
+        assert i18n.t("关于") == "About"
+        assert i18n.t("打开许可证文件夹") == "Open Licenses Folder"
+        assert i18n.t("失败原因") == "Failure Details"
+        assert i18n.t("Practical-RIFE 4.25（可选）") == (
+            "Practical-RIFE 4.25 (optional)"
+        )
+        assert i18n.t("GPL + 启动器例外") == "GPL + launcher exception"
+        assert "disk" in i18n.t(
+            "磁盘空间不足，处理无法继续。请清理磁盘空间后重试。"
+        ).lower()
+        assert i18n.t("临时空间不足：需要约 {need}，当前可用 {free}。\n位置：{path}",
+                      need="1 GB", free="2 GB", path="C:\\").startswith(
+            "Not enough temporary space"
+        )
+    finally:
+        i18n.set_language("zh")

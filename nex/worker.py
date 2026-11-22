@@ -134,11 +134,12 @@ class PipelineWorker(QThread):
         except (EngineError, PipelineError) as exc:
             task.status = TaskStatus.FAILED
             task.stage = "失败"
-            task.error = str(exc)
+            message = exc.short() if isinstance(exc, EngineError) else str(exc)
+            task.error = message
             task.finished_at = time.time()
             task.log_path = getattr(exc, "log_path", "") or task.log_path
             self.repo.update(task)
-            self.taskFinished.emit(task.id, "failed", str(exc))
+            self.taskFinished.emit(task.id, "failed", message)
         except Exception as exc:  # 防御：不应发生的内部错误
             task.status = TaskStatus.FAILED
             task.stage = "失败"

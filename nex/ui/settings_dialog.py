@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
 from .. import APP_VERSION
 from ..app_config import AppConfig
 from ..i18n import LANGUAGE_LABELS, t
+from .about_dialog import AboutDialog
 from .base_dialog import BaseDialog
 from .tutorial import TutorialDialog
 from .widgets import make_spin_box
@@ -90,14 +91,15 @@ class SettingsDialog(BaseDialog):
         self.tutorialBtn = QPushButton(t("使用教程"), tutorial_row)
         self.tutorialBtn.clicked.connect(self._show_tutorial)
         tutorial_layout.addWidget(self.tutorialBtn)
+        self.aboutBtn = QPushButton(t("关于"), tutorial_row)
+        self.aboutBtn.clicked.connect(self._show_about)
+        tutorial_layout.addWidget(self.aboutBtn)
         tutorial_layout.addStretch(1)
         self.contentLayout.addWidget(tutorial_row)
 
         about = QLabel(
             t(
-                "版本 {version} · 开源组件：Real-ESRGAN（BSD-3）、RIFE（MIT）、"
-                "FFmpeg（GPL v3）、PySide6（LGPLv3）\n"
-                "许可证文本见安装目录 licenses/。温度保护上限设为 0 表示关闭。",
+                "版本 {version} · 开源组件许可证可在「关于」中查看。",
                 version=APP_VERSION,
             ),
             self,
@@ -116,6 +118,9 @@ class SettingsDialog(BaseDialog):
 
     def _show_tutorial(self) -> None:
         TutorialDialog(self).exec()
+
+    def _show_about(self) -> None:
+        AboutDialog(self).exec()
 
     def accept(self) -> None:
         self.config.output_dir = self.outEdit.text().strip()

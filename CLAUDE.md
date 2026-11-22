@@ -3,7 +3,7 @@
 Windows 11 桌面端 **AI 视频超分 + 补帧**软件（商用产品，类似 SVFI / Topaz Video AI）。
 技术栈：Python 3.11 + PySide6（原生控件 + 自定义 QSS）；引擎为 FFmpeg + realesrgan-ncnn-vulkan + rife-ncnn-vulkan（Vulkan / NVIDIA GPU）。
 
-当前阶段：**S6 打包与安装包（已完成，待用户确认）**
+当前阶段：**S7 打磨与终测（已完成，待用户终验）**
 
 ## 标准文件索引
 
