@@ -1,4 +1,4 @@
-# 您的打赏可以帮助更新[![爱发电](https://img.shields.io/badge/打赏-爱发电-946ce6?style=flat&labelColor=444444&logoSize=auto)](https://ifdian.net/a/pgy123)
+# 您的打赏可以帮助更新 [![爱发电](https://img.shields.io/badge/打赏-爱发电-946ce6?style=flat&labelColor=444444&logoSize=auto)](https://ifdian.net/a/pgy123)
 # NEX 视频增强 · NEX Video Enhancer
 
 Windows 11 桌面端 **AI 视频超分 + 补帧** 应用。导入视频，选择超分与补帧参数，导出保留原音频的新视频。
