@@ -26,6 +26,8 @@ CREATE_NO_WINDOW = 0x08000000 if os.name == "nt" else 0
 # MP4 中可直接复制的音频编码；其余转 AAC
 COPY_OK_AUDIO = {"aac", "mp3", "ac3", "eac3", "alac"}
 
+PRACTICAL_RIFE_MODEL = "practical-rife-4.25"
+
 
 class EngineError(RuntimeError):
     def __init__(
@@ -114,6 +116,41 @@ def rife_dir() -> Path:
 
 def rife_exe() -> Path:
     return rife_dir() / "rife-ncnn-vulkan.exe"
+
+
+def practical_rife_repo() -> Path:
+    override = os.environ.get("NEX_PRACTICAL_RIFE_DIR")
+    if override:
+        return Path(override)
+    return app_root() / "Practical-RIFE"
+
+
+def practical_rife_model_dir() -> Path:
+    return practical_rife_repo() / "train_log"
+
+
+def practical_rife_python() -> Path:
+    override = os.environ.get("NEX_RIFE_PYTHON")
+    if override:
+        return Path(override)
+    return app_root() / ".venv-rife" / "Scripts" / "python.exe"
+
+
+def practical_rife_runner() -> Path:
+    return app_root() / "tools" / "practical_rife_runner.py"
+
+
+def check_practical_rife() -> list[str]:
+    """返回 Practical-RIFE 4.25 环境缺失项。"""
+    repo = practical_rife_repo()
+    required = [
+        practical_rife_python(),
+        practical_rife_runner(),
+        repo / "train_log" / "flownet.pkl",
+        repo / "train_log" / "IFNet_HDv3.py",
+        repo / "model" / "warplayer.py",
+    ]
+    return [str(path) for path in required if not path.exists()]
 
 
 def check_engines() -> list[str]:
@@ -411,6 +448,70 @@ def run_fi(
 
     run_process(cmd, rife_dir(), log_path, cancel, poll, stage="补帧")
     return count_frames(output_dir)
+
+
+def run_fi_pytorch(
+    input_dir: Path,
+    output_dir: Path,
+    model_dir: Path,
+    multi: int,
+    scale: float,
+    fp16: bool,
+    progress_file: Path,
+    log_path: Path,
+    cancel,
+    total_frames: int,
+    on_progress: Optional[Callable[[float], None]] = None,
+) -> int:
+    missing = check_practical_rife()
+    if missing:
+        raise EngineError(
+            "补帧",
+            t(
+                "Practical-RIFE 4.25 环境不完整：\n{files}",
+                files="\n".join(missing),
+            ),
+        )
+    output_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        progress_file.unlink()
+    except OSError:
+        pass
+    cmd = [
+        str(practical_rife_python()),
+        str(practical_rife_runner()),
+        "--repo", str(practical_rife_repo()),
+        "--model", str(model_dir),
+        "--input", str(input_dir),
+        "--output", str(output_dir),
+        "--multi", str(multi),
+        "--scale", str(scale),
+        "--progress", str(progress_file),
+    ]
+    if fp16:
+        cmd.append("--fp16")
+    expected = max(1, total_frames * multi)
+
+    def poll() -> None:
+        if on_progress:
+            on_progress(
+                min(1.0, count_frames(output_dir) / expected)
+            )
+
+    run_process(cmd, app_root(), log_path, cancel, poll, stage="补帧")
+    count = count_frames(output_dir)
+    if count != expected:
+        engine_log = log_path.with_name(f"{log_path.stem}.engine.log")
+        raise EngineError(
+            "补帧",
+            t(
+                "Practical-RIFE 输出帧数不符：{count}/{expected}",
+                count=count,
+                expected=expected,
+            ),
+            log_tail=_tail(engine_log),
+        )
+    return count
 
 
 def encode_video(

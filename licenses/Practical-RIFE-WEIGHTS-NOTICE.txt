@@ -1,0 +1,17 @@
+Practical-RIFE 4.25 pretrained weights
+======================================
+
+Source: https://github.com/hzwer/Practical-RIFE
+Weight file: train_log/flownet.pkl (version 4.25, September 2024)
+
+The Practical-RIFE README states:
+
+    "Trained Model
+     The content of these links is under the same MIT license as this project."
+
+Therefore the 4.25 pretrained weights are distributed under the MIT license,
+the same as the Practical-RIFE source code. See Practical-RIFE-LICENSE.txt
+for the full MIT license text (Copyright (c) 2021 hzwer).
+
+NEX uses these weights only when the optional "Practical-RIFE 4.25 (PyTorch)"
+interpolation engine is selected.

@@ -17,6 +17,7 @@ from qfluentwidgets import (
     SwitchButton,
 )
 
+from .. import engines
 from ..i18n import t
 
 SR_MODELS = [
@@ -30,6 +31,7 @@ FI_MODELS = [
     ("rife-anime（动漫）", "rife-anime"),
     ("rife-HD", "rife-HD"),
     ("rife-UHD", "rife-UHD"),
+    ("RIFE 4.25（PyTorch，需额外环境）", "practical-rife-4.25"),
 ]
 FPS_OPTIONS = ["2x", "4x", "60", "120"]
 
@@ -113,7 +115,13 @@ class AddTaskDialog(MessageBoxBase):
         self.fiSwitch = SwitchButton(form_host)
         self.fiSwitch.setChecked(True)
         self.fiModel = ComboBox(form_host)
-        self.fiModel.addItems([t(text) for text, _ in FI_MODELS])
+        pt_missing = bool(engines.check_practical_rife())
+        self._fi_models = [
+            (label, value)
+            for label, value in FI_MODELS
+            if value != engines.PRACTICAL_RIFE_MODEL or not pt_missing
+        ]
+        self.fiModel.addItems([t(text) for text, _ in self._fi_models])
         self.fiFps = ComboBox(form_host)
         self.fiFps.addItems(FPS_OPTIONS)
         self.fiFps.setCurrentIndex(0)
@@ -205,7 +213,7 @@ class AddTaskDialog(MessageBoxBase):
             sr_scale=sr_scale,
             sr_height=sr_height,
             fi_enabled=self.fiSwitch.isChecked(),
-            fi_model=FI_MODELS[self.fiModel.currentIndex()][1],
+            fi_model=self._fi_models[self.fiModel.currentIndex()][1],
             fi_mult=fi_mult,
             fi_fps=fi_fps,
             start_now=self.startCheck.isChecked(),

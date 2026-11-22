@@ -11,6 +11,8 @@ BACKUP_DIR = ROOT.parent / "NEX-backups"
 
 EXCLUDE_PARTS = {
     ".venv",
+    ".venv-rife",
+    "wheels",
     "engines",
     ".test",
     ".pytest_cache",

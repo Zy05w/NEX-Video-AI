@@ -42,6 +42,8 @@ Windows 11 桌面端 **AI 视频超分 + 补帧**软件（商用产品，类似 
 | 拖入视频试用 | 把视频拖到 `拖入视频测试.bat` 上，按菜单选择 | S3 起 |
 | 本地备份 | 双击 `备份项目.bat`（输出到 `D:\Claude\NEX-backups`，含 Git 历史，排除引擎/虚拟环境） | S5 起 |
 | 运行测试 | `.venv\Scripts\python.exe -m pytest -q` | S3 起 |
+| 4.25 补帧测试 | `.venv-rife\Scripts\python.exe -m nex.cli 输入.mp4 --fi practical-rife-4.25 --fi-mult 2` | S5 起 |
 | 打包 | `pyinstaller build/nex.spec` | S6 起 |
 
 > 显卡温度保护默认开启（88°C 上限）；CLI 可加 `--temp-limit 90` 调整，`--temp-limit 0` 关闭。
+> Practical-RIFE 4.25 使用独立 `.venv-rife`（torch 2.11.0+cu128）；主程序仅通过子进程调用，v1 默认不随安装包分发。

@@ -101,3 +101,18 @@ def test_fi_target_not_above_source_is_skipped():
 def test_fi_rejects_conflicting_options():
     with pytest.raises(PipelineError):
         _plan_fi(FIOptions(enabled=True, multiplier=2, target_fps=60), INFO)
+
+
+def test_fi_accepts_practical_rife_model():
+    from nex import engines
+
+    passes, fps, _ = _plan_fi(
+        FIOptions(
+            enabled=True,
+            model=engines.PRACTICAL_RIFE_MODEL,
+            multiplier=2,
+        ),
+        INFO,
+    )
+    assert passes == 1
+    assert fps == 48.0

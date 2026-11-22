@@ -27,7 +27,7 @@ SR_SCALES = {
 FI_MODELS = {
     "rife", "rife-HD", "rife-UHD", "rife-anime", "rife-v2",
     "rife-v2.3", "rife-v2.4", "rife-v3.0", "rife-v3.1",
-    "rife-v4", "rife-v4.6",
+    "rife-v4", "rife-v4.6", engines.PRACTICAL_RIFE_MODEL,
 }
 
 
@@ -275,6 +275,19 @@ def run_pipeline(
         if not options.sr.enabled and not options.fi.enabled:
             raise PipelineError(t("请至少开启超分或补帧中的一项"))
 
+        if (
+            options.fi.enabled
+            and options.fi.model == engines.PRACTICAL_RIFE_MODEL
+        ):
+            missing = engines.check_practical_rife()
+            if missing:
+                raise PipelineError(
+                    t(
+                        "Practical-RIFE 4.25 环境不完整：\n{files}",
+                        files="\n".join(missing),
+                    )
+                )
+
         sr_plan = _plan_sr(options.sr, info)
         fi_passes, final_fps, fi_note = _plan_fi(options.fi, info)
         have_sr = sr_plan is not None and not sr_plan["skip"]
@@ -426,10 +439,29 @@ def run_pipeline(
                     overall = ((index - 1) + fraction) / fi_passes
                     emit("补帧", overall, f"第 {index}/{fi_passes} 遍")
 
-                new_count = engines.run_fi(
-                    current_frames, fi_out, options.fi.model,
-                    options.gpu_id, logger.path, cancel, total_in, fi_cb,
-                )
+                if options.fi.model == engines.PRACTICAL_RIFE_MODEL:
+                    pt_progress = (
+                        temp_root / f"rife_pt_progress_{pass_index}.txt"
+                    )
+                    new_count = engines.run_fi_pytorch(
+                        current_frames,
+                        fi_out,
+                        engines.practical_rife_model_dir(),
+                        2,
+                        1.0,
+                        True,
+                        pt_progress,
+                        logger.path,
+                        cancel,
+                        total_in,
+                        fi_cb,
+                    )
+                else:
+                    new_count = engines.run_fi(
+                        current_frames, fi_out, options.fi.model,
+                        options.gpu_id, logger.path, cancel, total_in,
+                        fi_cb,
+                    )
                 if new_count <= 0:
                     raise PipelineError(t("补帧失败：没有生成任何帧"))
                 logger.log(

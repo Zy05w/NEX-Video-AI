@@ -103,6 +103,13 @@ EN = {
     "动漫插画": "Anime Illustration",
     "rife-v4.6（推荐）": "rife-v4.6 (Recommended)",
     "rife-anime（动漫）": "rife-anime (Anime)",
+    "RIFE 4.25（PyTorch，需额外环境）": "RIFE 4.25 (PyTorch, extra environment required)",
+    "Practical-RIFE 4.25 环境不完整：\n{files}": (
+        "Practical-RIFE 4.25 environment is incomplete:\n{files}"
+    ),
+    "Practical-RIFE 输出帧数不符：{count}/{expected}": (
+        "Practical-RIFE frame count mismatch: {count}/{expected}"
+    ),
     # 设置
     "默认输出目录": "Default Output Folder",
     "视频编码器": "Video Encoder",

@@ -2,11 +2,15 @@
 __pycache__/
 *.py[cod]
 .venv/
+.venv-*/
 venv/
 .pytest_cache/
 
 # 第三方引擎与模型（体积大，按需下载）
 engines/
+
+# 离线安装包（PyTorch 等大体积 wheel）
+wheels/
 
 # 用户自行下载的第三方参考源码（不属于本项目）
 Real-ESRGAN-main/
