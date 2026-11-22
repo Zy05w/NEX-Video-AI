@@ -40,7 +40,7 @@ Windows 11 桌面端 **AI 视频超分 + 补帧**软件（商用产品，类似 
 | 命令行处理 | `.venv\Scripts\python.exe -m nex.cli 输入.mp4 --sr realesr-animevideov3 --sr-scale 2` | S3 起 |
 | 命令行补帧 | `.venv\Scripts\python.exe -m nex.cli 输入.mp4 --fi rife-v4.6 --fi-mult 2` | S3 起 |
 | 拖入视频试用 | 把视频拖到 `拖入视频测试.bat` 上，按菜单选择 | S3 起 |
-| 本地备份 | 双击 `备份项目.bat`（输出到 `D:\Claude\NEX-backups`，含 Git 历史，排除引擎/虚拟环境） | S5 起 |
+| 本地备份 | 双击 `备份项目.bat`（输出到 `项目上级目录/NEX-backups`，含 Git 历史，排除引擎/虚拟环境） | S5 起 |
 | 运行测试 | `.venv\Scripts\python.exe -m pytest -q` | S3 起 |
 | 4.25 补帧测试 | `.venv-rife\Scripts\python.exe -m nex.cli 输入.mp4 --fi practical-rife-4.25 --fi-mult 2` | S5 起 |
 | 打包程序 | `pyinstaller build/nex.spec` → `dist\NEX` | S6 起 |
